@@ -1,0 +1,30 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Dataset folder & image files
+dataset/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bmp
+
+# Cache & Log files
+.face_encodings_cache.pkl
+*.pkl
+rename_log.txt
+*.log
+
+# IDE & System files
+.DS_Store
+.idea/
+.vscode/

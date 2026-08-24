@@ -1,0 +1,79 @@
+# ============================================================
+# Face Recognition Classifier - Cấu hình
+# ============================================================
+
+# Đường dẫn tới thư mục gốc chứa tất cả folder ảnh
+dataset_root: "./dataset"
+
+# Tên thư mục chứa ảnh CHƯA phân loại (sẽ được đổi tên)
+unclassified_dir: "chua_phan_loai"
+
+# ============================================================
+# Exclude directories
+# Các thư mục KHÔNG dùng làm known faces (bỏ qua khi load)
+# ============================================================
+exclude_dirs:
+  - "chua_phan_loai"   # thư mục cần xử lý
+  - "khac"             # người khác / không rõ danh tính
+  - "other"            # ảnh không phân loại theo người
+  # Thêm tên folder khác nếu cần, ví dụ:
+  # - "events"
+  # - "archive"
+
+# ============================================================
+# Nhận diện khuôn mặt
+# ============================================================
+
+# Ngưỡng nhận diện (0.0 - 1.0)
+# Càng thấp = càng nghiêm ngặt (ít nhận sai, nhưng có thể bỏ sót)
+# Mặc định: 0.55 (chặt hơn default 0.6 của face_recognition)
+tolerance: 0.55
+
+# Model nhận diện: "hog" (nhanh, CPU) hoặc "cnn" (chính xác hơn, cần GPU)
+model: "hog"
+
+# Số lượng ảnh tối đa lấy từ mỗi folder để làm known faces
+# null = lấy tất cả
+# Với dataset lớn (60 người x vài trăm ảnh):
+#   - 30 anh/nguoi: encode ~1-2 phut, chinh xac tot
+#   - 50 anh/nguoi: encode ~3-5 phut, chinh xac cao hon
+#   - null: rat cham lan dau, nhung cache giai quyet duoc
+max_images_per_person: 50
+
+# ============================================================
+# Dat ten file - Confidence tiers
+# ============================================================
+
+# Nguong confidence THAP (%) - duoi muc nay dung low_confidence_format
+# Vi du: 70 → confidence < 70% → low_j97_IMG_001.jpg
+low_confidence_threshold: 70
+
+# Format ten file cho anh nhan dien duoc (confidence >= low_confidence_threshold)
+name_format: "{person}_{original}"
+
+# Format ten file cho anh nhan dien duoc nhung confidence thap
+# Prefix "low_" de de review thu cong sau
+low_confidence_format: "low_{person}_{original}"
+
+# Prefix cho anh khong nhan dien duoc hoac co nhieu khuon mat
+unknown_prefix: "unknown"
+
+# ============================================================
+# Cache
+# ============================================================
+
+# Bat/tat cache encodings (NEN de true voi dataset lon)
+# Lan dau chay: cham (encode tat ca anh training)
+# Lan sau: load cache gan nhu ngay lap tuc
+use_cache: true
+
+# Ten file cache (luu tai dataset_root)
+cache_file: ".face_encodings_cache.pkl"
+
+# ============================================================
+# Logging
+# ============================================================
+
+# Ghi log ra file
+log_to_file: true
+log_file: "rename_log.txt"
