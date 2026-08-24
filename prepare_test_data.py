@@ -39,7 +39,7 @@ def main(config: str, target_dir: str, count: int, copy: bool):
         cfg = yaml.safe_load(f)
 
     dataset_root = Path(cfg.get("dataset_root", "./dataset")).expanduser().resolve()
-    unclassified_name = target_dir or cfg.get("unclassified_dir", "chua_phan_loai")
+    unclassified_name = cfg.get("unclassified_dir", "chua_phan_loai")
 
     # 1. Kiểm tra backup dir
     backup_dir = dataset_root.parent / "dataset-backup"
