@@ -132,6 +132,7 @@ DO_ORGANIZE=false
 DO_PREPARE=false
 DO_CLEAR_CACHE=false
 IS_APPLY=false
+IS_YES=false
 TARGET_DIR=""
 DIR_ARGS=()
 
@@ -170,6 +171,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --apply|-a)
             IS_APPLY=true
+            shift
+            ;;
+        --yes|-y)
+            IS_YES=true
             shift
             ;;
         --rename|-r)
@@ -242,6 +247,11 @@ if [ "$IS_APPLY" = true ]; then
     APPLY_FLAG=("--apply")
 fi
 
+YES_FLAG=()
+if [ "$IS_YES" = true ]; then
+    YES_FLAG=("-y")
+fi
+
 # ── 3. Rename faces ─────────────────────────────────────────
 if [ "$DO_RENAME" = true ]; then
     if [ "$IS_APPLY" = true ]; then
@@ -256,7 +266,7 @@ fi
 # ── 4. Auto-cluster unknown faces ───────────────────────────
 if [ "$DO_CLUSTER" = true ]; then
     if [ "$IS_APPLY" = true ]; then
-        info "🤖 Đang GOM NHÓM & TẠO FOLDER NGƯỜI MỚI tự động..."
+        info "🤖 Đang GOM NHÓM người mới tự động..."
     else
         info "🤖 Dry-run GOM NHÓM người lạ..."
     fi
@@ -271,7 +281,7 @@ if [ "$DO_ORGANIZE" = true ]; then
     else
         info "🔍 Dry-run DI CHUYỂN file về folder người..."
     fi
-    "$PYTHON" "$ORGANIZE" "${APPLY_FLAG[@]}" "${DIR_ARGS[@]}"
+    "$PYTHON" "$ORGANIZE" "${APPLY_FLAG[@]}" "${YES_FLAG[@]}" "${DIR_ARGS[@]}"
     echo ""
 fi
 

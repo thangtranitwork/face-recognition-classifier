@@ -222,7 +222,6 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
             click.echo(f"   • {fpath.name}")
 
         if apply:
-            target_dir.mkdir(exist_ok=True, parents=True)
             for fpath in cluster_files:
                 # Làm sạch tên file (bỏ prefix unknown_ nếu có)
                 clean_name = fpath.name
@@ -248,16 +247,9 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
                 except Exception as e:
                     click.echo(f"  ❌ Lỗi đổi tên {fpath.name}: {e}", err=True)
 
-            click.echo(f"   ✅ Đã tạo folder '{folder_name}' trong dataset & đổi tên {len(cluster_files)} file thành {folder_name}_...\n")
+            click.echo(f"   ✅ Đã đổi tên {len(cluster_files)} file thành {folder_name}_... (Chạy -o để gán tên thật & di chuyển vào dataset)\n")
 
         next_idx += 1
-
-    # 3. Xóa cache nếu apply để lần chạy sau tự động học người mới
-    if apply and moved_total > 0:
-        cache_file = dataset_root / cfg.get("cache_file", ".face_encodings_cache.pkl")
-        if cache_file.exists():
-            cache_file.unlink()
-            click.echo("🔄 Đã tự động làm mới cache để cập nhật các người mới vào hệ thống.")
 
     click.echo("=" * 60)
     click.echo("  KẾT QUẢ CLUSTERING")
