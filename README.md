@@ -1,78 +1,124 @@
 # Face Recognition File Renamer
 
-Tool tự động nhận diện khuôn mặt và đổi tên ảnh trong thư mục chưa phân loại.
+An automated CLI tool that detects faces in unclassified images and renames files based on matched persons using deep learning (`dlib` / `face_recognition`).
 
-## Cấu trúc thư mục
+---
 
-```
+## 📁 Directory Structure
+
+Organize your dataset folder as shown below:
+
+```text
 face-recognition-classifier/
-├── rename_faces.py       # Script chính
-├── config.yaml           # Cấu hình
-├── requirements.txt      # Dependencies
-└── dataset/              # Đặt dataset của bạn ở đây
-    ├── nguoi_A/          # Ảnh đã phân loại của người A (≥9 ảnh)
-    ├── nguoi_B/
-    ├── nguoi_C/
-    ├── khac/             # Folder bị exclude (trong config)
-    └── chua_phan_loai/   # Ảnh sẽ được đổi tên
+├── rename_faces.py       # Main Python script
+├── config.yaml           # Configuration file
+├── run.sh                # Executable runner script
+├── requirements.txt      # Python dependencies
+└── dataset/              # Your dataset directory (ignored by git)
+    ├── person_A/         # Classifiers for Person A (labeled images)
+    ├── person_B/         # Classifiers for Person B
+    ├── other/            # Excluded directory (configurable)
+    └── chua_phan_loai/   # Target directory containing unclassified images
 ```
 
-## Cài đặt
+---
+
+## ⚡ Quick Start
+
+### 1. Installation
+
+Automatic setup (creates virtual environment, installs dependencies, and applies compatibility patches):
 
 ```bash
-# 1. Tạo virtualenv (khuyến nghị)
-python3 -m venv .venv
-source .venv/bin/activate
+chmod +x run.sh
+./run.sh --setup
+```
 
-# 2. Cài dlib (dependency của face_recognition)
-# Ubuntu/Debian:
+*Or manually install system dependencies & python requirements:*
+
+```bash
+# Ubuntu / Debian
 sudo apt-get install -y cmake libopenblas-dev liblapack-dev
 
-# 3. Cài packages
+# Virtual Environment & Requirements
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Sử dụng
+---
+
+## 🚀 Usage
+
+### Preview Mode (Dry-Run)
+Inspect recognition results and proposed file renaming **without modifying any files**:
 
 ```bash
-# Dry-run: xem kết quả nhận diện mà không đổi tên
-python rename_faces.py
-
-# Thực sự đổi tên
-python rename_faces.py --apply
-
-# Xóa cache và build lại (khi thêm ảnh training mới)
-python rename_faces.py --clear-cache
-
-# Chỉ định thư mục chưa phân loại khác (ghi đè config)
-python rename_faces.py --unclassified-dir "folder_khac" --apply
-
-# Dùng file config khác
-python rename_faces.py --config /path/to/other_config.yaml
+./run.sh
+# Or directly via Python:
+.venv/bin/python rename_faces.py
 ```
 
-## Kết quả đổi tên
+### Apply Renaming
+Execute the actual file renaming:
 
-| Trường hợp | Tên file gốc | Tên file mới |
-|---|---|---|
-| Nhận diện được | `IMG_001.jpg` | `nguoi_A_IMG_001.jpg` |
-| Không nhận diện | `IMG_002.jpg` | `unknown_IMG_002.jpg` |
-| Nhiều khuôn mặt | `IMG_003.jpg` | `unknown_IMG_003.jpg` |
-| Không có mặt | `IMG_004.jpg` | `unknown_IMG_004.jpg` |
+```bash
+./run.sh --apply
+# Or directly via Python:
+.venv/bin/python rename_faces.py --apply
+```
 
-## Cấu hình quan trọng (`config.yaml`)
+### Rebuild Face Cache
+Invalidate cached encodings when adding new training images or folders:
 
-| Setting | Mặc định | Mô tả |
-|---|---|---|
-| `exclude_dirs` | `[chua_phan_loai, khac]` | Folder bỏ qua khi load known faces |
-| `tolerance` | `0.55` | Ngưỡng nhận diện (thấp hơn = nghiêm hơn) |
-| `max_images_per_person` | `50` | Giới hạn ảnh training/người (null = lấy hết) |
-| `model` | `hog` | `hog` (nhanh/CPU) hoặc `cnn` (chính xác/GPU) |
-| `use_cache` | `true` | Cache encodings để chạy nhanh lần sau |
+```bash
+./run.sh --clear-cache
+```
 
-## Lưu ý
+---
 
-- **Cache**: Lần đầu chạy sẽ chậm (encode tất cả ảnh training). Lần sau dùng cache nhanh hơn nhiều. Cache tự invalidate khi dataset thay đổi.
-- **Tolerance**: Nếu nhận diện sai nhiều → giảm tolerance (0.5). Nếu bỏ sót nhiều → tăng lên (0.6).
-- **Ảnh training**: Mỗi người nên có ảnh đa dạng góc chụp, ánh sáng để nhận diện chính xác hơn.
-- **Dry-run luôn trước**: Xem log để kiểm tra kết quả trước khi chạy `--apply`.
+## 🏷️ Renaming Rules & Confidence Tiers
+
+The tool renames files according to face matching confidence:
+
+| Scenario | Input Example | Output Example | Log Status |
+|---|---|---|---|
+| **High Confidence** ($\ge 70\%$) | `IMG_001.jpg` | `person_A_IMG_001.jpg` | ✅ `[confidence 100.0%]` |
+| **Low Confidence** ($< 70\%$) | `IMG_002.jpg` | `low_person_A_IMG_002.jpg` | ⚠️ `[confidence 54.2%]` |
+| **No Face Detected** | `IMG_003.jpg` | `unknown_IMG_003.jpg` | ❓ `[no face detected]` |
+| **Multiple Faces** | `IMG_004.jpg` | `unknown_IMG_004.jpg` | ❓ `[multiple faces detected]` |
+
+---
+
+## ⚙️ Configuration (`config.yaml`)
+
+Key options available in `config.yaml`:
+
+```yaml
+dataset_root: "./dataset"
+unclassified_dir: "chua_phan_loai"
+
+# Exclude non-person folders from encoding
+exclude_dirs:
+  - "chua_phan_loai"
+  - "khac"
+  - "other"
+
+# Recognition threshold (0.0 - 1.0; lower is stricter)
+tolerance: 0.55
+
+# Maximum sample images encoded per person (optimizes speed for large datasets)
+max_images_per_person: 50
+
+# Confidence threshold (%) to trigger low_ prefix
+low_confidence_threshold: 70
+```
+
+---
+
+## ✨ Features
+
+- **Smart Encoding Cache**: MD5-fingerprinted cache ensures instant startup after initial encoding.
+- **Adaptive Face Sampling**: Evaluates images until target valid face encodings are acquired, skipping images without faces.
+- **Dry-Run Default**: Safe execution mode prevents accidental mass file renaming.
+- **Detailed Logging**: Logs match results, confidence levels, and distance metrics to `rename_log.txt`.
