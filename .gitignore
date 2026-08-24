@@ -12,6 +12,8 @@ __pycache__/
 
 # Dataset folder & image files
 dataset/
+dataset-backup/
+dataset_backup/
 *.jpg
 *.jpeg
 *.png

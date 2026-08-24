@@ -48,9 +48,20 @@ def main(config: str, count: int, copy: bool):
         if d.is_dir() and d.name.lower() not in exclude_dirs
     ]
 
-    if not person_dirs:
-        click.echo("❌ Không tìm thấy thư mục người nào trong dataset.")
-        sys.exit(1)
+    # 1. Khôi phục từ dataset-backup nếu tồn tại
+    backup_dir = dataset_root.parent / "dataset-backup"
+    if not backup_dir.exists():
+        backup_dir = dataset_root.parent / "dataset_backup"
+
+    if backup_dir.exists():
+        click.echo(f"🔄 Khôi phục dataset từ backup '{backup_dir.name}' → '{dataset_root.name}'...")
+        for src_file in backup_dir.rglob("*"):
+            if src_file.is_file() and src_file.suffix.lower() in VALID_EXTENSIONS:
+                rel_path = src_file.relative_to(backup_dir)
+                dest_file = dataset_root / rel_path
+                dest_file.parent.mkdir(exist_ok=True, parents=True)
+                shutil.copy2(src_file, dest_file)
+        click.echo("✅ Khôi phục dataset thành công!\n")
 
     action_name = "Copying" if copy else "Moving"
     click.echo(f"📦 {action_name} {count} ảnh từ mỗi folder sang '{unclassified_name}/'...\n")
