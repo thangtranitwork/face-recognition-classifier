@@ -68,6 +68,19 @@ Execute the actual file renaming:
 .venv/bin/python rename_faces.py --apply
 ```
 
+### Auto-Cluster Unknown Persons
+Group unclassified/unknown faces using DBSCAN clustering and automatically create training folders for new persons (`nguoi_moi_1`, `nguoi_moi_2`...):
+
+```bash
+# Preview clusters (dry-run)
+./run.sh --cluster
+
+# Automatically create new person folders & move grouped files
+./run.sh --cluster-apply
+# Or directly via Python:
+.venv/bin/python cluster_faces.py --apply
+```
+
 ### Move Renamed Files to Person Folders (Organize)
 Move successfully classified files from `chua_phan_loai/` to their respective person folders (**excluding `unknown_*` files**):
 

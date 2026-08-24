@@ -10,6 +10,7 @@ PYTHON="$VENV/bin/python"
 MAIN="$SCRIPT_DIR/rename_faces.py"
 ORGANIZE="$SCRIPT_DIR/organize_faces.py"
 PREPARE="$SCRIPT_DIR/prepare_test_data.py"
+CLUSTER="$SCRIPT_DIR/cluster_faces.py"
 CONFIG="$SCRIPT_DIR/config.yaml"
 
 # ── Màu sắc ─────────────────────────────────────────────────
@@ -48,8 +49,12 @@ print_usage() {
     echo "  --organize        Dry-run — xem trước việc di chuyển file đã đổi tên"
     echo "  --organize-apply  Thực sự DI CHUYỂN file đã đổi tên vào đúng folder người (TRỪ unknown_*)"
     echo ""
+    echo -e "${BOLD}Options cho GOM NHÓM NGƯỜI LẠ (Auto-Clustering):${NC}"
+    echo "  --cluster         Dry-run — phân tích & xem các nhóm người lạ xuất hiện nhiều lần"
+    echo "  --cluster-apply   Tự động TẠO FOLDER NGƯỜI MỚI (nguoi_moi_1, 2...) và di chuyển file vào"
+    echo ""
     echo -e "${BOLD}Options cho KIỂM THỬ (Test):${NC}"
-    echo "  --prepare-test    Lấy ngẫu nhiên N ảnh từ dataset chuyển sang chua_phan_loai để test"
+    echo "  --prepare-test    Reset dataset & lấy ngẫu nhiên N ảnh sang chua_phan_loai để test"
     echo ""
     echo -e "${BOLD}Hệ thống:${NC}"
     echo "  --setup           Cài đặt dependencies (chạy lần đầu)"
@@ -58,8 +63,8 @@ print_usage() {
     echo -e "${BOLD}Ví dụ:${NC}"
     echo "  ./run.sh                  # Preview kết quả đổi tên"
     echo "  ./run.sh --apply          # Đổi tên file thật"
+    echo "  ./run.sh --cluster-apply  # Gom nhóm người lạ & tự tạo folder mới"
     echo "  ./run.sh --organize-apply # Chuyển file đã đổi tên vào folder từng người (trừ unknown)"
-    echo "  ./run.sh --prepare-test   # Lấy ngẫu nhiên ảnh để test"
 }
 
 # ── Setup: tạo venv + cài packages ──────────────────────────
@@ -153,6 +158,18 @@ case "${1:-}" in
         "$PYTHON" "$ORGANIZE" --apply
         ;;
 
+    --cluster)
+        check_env
+        info "Dry-run gom nhóm người lạ..."
+        "$PYTHON" "$CLUSTER"
+        ;;
+
+    --cluster-apply)
+        check_env
+        info "Đang GOM NHÓM & TẠO FOLDER NGƯỜI MỚI tự động..."
+        "$PYTHON" "$CLUSTER" --apply
+        ;;
+
     --prepare-test)
         check_env
         info "Đang chuyển ảnh mẫu sang thư mục chua_phan_loai để test..."
@@ -172,6 +189,7 @@ case "${1:-}" in
         "$PYTHON" "$MAIN"
         echo ""
         echo -e "${YELLOW}💡 Nếu hài lòng, chạy: ./run.sh --apply${NC}"
+        echo -e "${YELLOW}💡 Để gom nhóm người lạ xuất hiện nhiều lần: ./run.sh --cluster-apply${NC}"
         echo -e "${YELLOW}💡 Để chuyển file đã đổi tên về đúng folder người: ./run.sh --organize-apply${NC}"
         ;;
 

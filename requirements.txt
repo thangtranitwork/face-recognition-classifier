@@ -5,4 +5,4 @@ click>=8.1.0
 numpy>=1.24.0
 PyYAML>=6.0
 opencv-python-headless>=4.7.0.72
-
+scikit-learn>=1.2.0

@@ -48,6 +48,20 @@ max_images_per_person: 50
 # Khuyên dùng: 10 - 15 frames (nhanh và đủ chính xác cho video 5s - 5phút)
 sample_frames_per_video: 12
 
+# ============================================================
+# Auto-Clustering (Gom nhóm tự động khuôn mặt người lạ)
+# ============================================================
+
+# Ngưỡng khoảng cách tối đa để gom thành cùng 1 người (0.40 - 0.50)
+cluster_eps: 0.45
+
+# Số lượng ảnh/video tối thiểu để tạo thành 1 nhóm người mới
+cluster_min_samples: 2
+
+# Tiền tố tên thư mục cho nhóm người mới được tạo (ví dụ: nguoi_moi_1, nguoi_moi_2)
+cluster_prefix: "nguoi_moi"
+
+
 
 # ============================================================
 # Dat ten file - Confidence tiers
