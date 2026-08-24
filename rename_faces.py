@@ -589,9 +589,9 @@ def process_unclassified(
     help="Xóa cache encodings và build lại từ đầu.",
 )
 @click.option(
-    "--unclassified-dir", "-u",
+    "--unclassified-dir", "-u", "-d", "--dir", "--target-dir",
     default=None,
-    help="Override tên thư mục chưa phân loại (ghi đè config).",
+    help="Tên hoặc đường dẫn thư mục cần xử lý (vd: 'other', 'chua_phan_loai').",
 )
 def main(config: str, apply: bool, clear_cache: bool, unclassified_dir: Optional[str]):
     """
@@ -619,17 +619,21 @@ def main(config: str, apply: bool, clear_cache: bool, unclassified_dir: Optional
         sys.exit(1)
 
     # Override unclassified_dir nếu được truyền qua CLI
-    unclassified_name = unclassified_dir or cfg["unclassified_dir"]
-    unclassified_path = dataset_root / unclassified_name
+    target_str = unclassified_dir or cfg["unclassified_dir"]
+    target_path = Path(target_str).expanduser().resolve()
+    if target_path.exists() and target_path.is_dir():
+        unclassified_path = target_path
+    else:
+        unclassified_path = dataset_root / target_str
 
     if not unclassified_path.exists():
-        click.echo(f"❌ Thư mục chưa phân loại không tồn tại: {unclassified_path}", err=True)
+        click.echo(f"❌ Thư mục không tồn tại: {unclassified_path}", err=True)
         sys.exit(1)
 
-    # Đảm bảo unclassified_dir luôn nằm trong exclude_dirs
+    # Đảm bảo thư mục target luôn nằm trong exclude_dirs (tránh dùng chính nó làm training)
     exclude_dirs: list[str] = cfg["exclude_dirs"]
-    if unclassified_name not in exclude_dirs:
-        exclude_dirs.append(unclassified_name)
+    if unclassified_path.name.lower() not in [d.lower() for d in exclude_dirs]:
+        exclude_dirs.append(unclassified_path.name)
 
     cache_path = dataset_root / cfg["cache_file"]
 

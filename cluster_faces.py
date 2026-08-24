@@ -87,12 +87,26 @@ def _extract_encoding_from_file(file_path: Path, model: str, sample_frames: int)
     return None
 
 
+def resolve_target_dir(target_dir_str: Optional[str], default_name: str, dataset_root: Path) -> Path:
+    if target_dir_str:
+        p = Path(target_dir_str).expanduser().resolve()
+        if p.exists() and p.is_dir():
+            return p
+        rel_p = dataset_root / target_dir_str
+        if rel_p.exists() and rel_p.is_dir():
+            return rel_p
+        click.echo(f"❌ Thư mục không tồn tại: '{target_dir_str}' (đã tìm ở {p} và {rel_p})", err=True)
+        sys.exit(1)
+    return dataset_root / default_name
+
+
 @click.command()
 @click.option("--config", "-c", default="config.yaml", show_default=True, help="Đường dẫn file config YAML.")
+@click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục cần gom nhóm (vd: 'other', 'chua_phan_loai' hoặc đường dẫn bất kỳ).")
 @click.option("--apply", is_flag=True, default=False, help="Thực sự tạo folder người mới và di chuyển file.")
 @click.option("--eps", default=None, type=float, help="Override ngưỡng khoảng cách DBSCAN (default trong config).")
 @click.option("--min-samples", default=None, type=int, help="Override số ảnh tối thiểu/nhóm (default trong config).")
-def main(config: str, apply: bool, eps: Optional[float], min_samples: Optional[int]):
+def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[float], min_samples: Optional[int]):
     cfg_path = Path(config)
     if not cfg_path.exists():
         click.echo(f"❌ Không tìm thấy file config: {config}", err=True)
@@ -103,7 +117,7 @@ def main(config: str, apply: bool, eps: Optional[float], min_samples: Optional[i
 
     dataset_root = Path(cfg.get("dataset_root", "./dataset")).expanduser().resolve()
     unclassified_name = cfg.get("unclassified_dir", "chua_phan_loai")
-    unclassified_dir = dataset_root / unclassified_name
+    unclassified_dir = resolve_target_dir(target_dir, unclassified_name, dataset_root)
     model = cfg.get("model", "hog")
     sample_frames = cfg.get("sample_frames_per_video", 12)
     unknown_prefix = cfg.get("unknown_prefix", "unknown").lower()
@@ -112,13 +126,9 @@ def main(config: str, apply: bool, eps: Optional[float], min_samples: Optional[i
     dbscan_eps = eps if eps is not None else float(cfg.get("cluster_eps", 0.45))
     dbscan_min_samples = min_samples if min_samples is not None else int(cfg.get("cluster_min_samples", 2))
 
-    if not unclassified_dir.exists():
-        click.echo(f"❌ Thư mục '{unclassified_dir}' không tồn tại.", err=True)
-        sys.exit(1)
-
     # Lấy danh sách tên những người đã biết trong dataset
     exclude_dirs = {d.lower() for d in cfg.get("exclude_dirs", [])}
-    exclude_dirs.add(unclassified_name.lower())
+    exclude_dirs.add(unclassified_dir.name.lower())
     known_person_names = {
         d.name.lower() for d in dataset_root.iterdir()
         if d.is_dir() and d.name.lower() not in exclude_dirs

@@ -26,11 +26,25 @@ VALID_EXTENSIONS = {
 }
 
 
+def resolve_target_dir(target_dir_str: Optional[str], default_name: str, dataset_root: Path) -> Path:
+    if target_dir_str:
+        p = Path(target_dir_str).expanduser().resolve()
+        if p.exists() and p.is_dir():
+            return p
+        rel_p = dataset_root / target_dir_str
+        if rel_p.exists() and rel_p.is_dir():
+            return rel_p
+        click.echo(f"❌ Thư mục không tồn tại: '{target_dir_str}' (đã tìm ở {p} và {rel_p})", err=True)
+        sys.exit(1)
+    return dataset_root / default_name
+
+
 @click.command()
 @click.option("--config", "-c", default="config.yaml", show_default=True, help="Đường dẫn file config YAML.")
+@click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục chứa file đã đổi tên (vd: 'other', 'chua_phan_loai').")
 @click.option("--apply", is_flag=True, default=False, help="Thực sự di chuyển file (mặc định là dry-run).")
 @click.option("--include-low", is_flag=True, default=True, help="Di chuyển cả ảnh low_confidence (mặc định: True).")
-def main(config: str, apply: bool, include_low: bool):
+def main(config: str, target_dir: Optional[str], apply: bool, include_low: bool):
     cfg_path = Path(config)
     if not cfg_path.exists():
         click.echo(f"❌ Không tìm thấy file config: {config}", err=True)
@@ -41,16 +55,12 @@ def main(config: str, apply: bool, include_low: bool):
 
     dataset_root = Path(cfg.get("dataset_root", "./dataset")).expanduser().resolve()
     unclassified_name = cfg.get("unclassified_dir", "chua_phan_loai")
-    unclassified_dir = dataset_root / unclassified_name
+    unclassified_dir = resolve_target_dir(target_dir, unclassified_name, dataset_root)
     unknown_prefix = cfg.get("unknown_prefix", "unknown").lower()
-
-    if not unclassified_dir.exists():
-        click.echo(f"❌ Thư mục '{unclassified_dir}' không tồn tại.", err=True)
-        sys.exit(1)
 
     # Thu thập danh sách thư mục người hợp lệ
     exclude_dirs = {d.lower() for d in cfg.get("exclude_dirs", [])}
-    exclude_dirs.add(unclassified_name.lower())
+    exclude_dirs.add(unclassified_dir.name.lower())
 
     person_dirs = {
         d.name.lower(): d for d in dataset_root.iterdir()

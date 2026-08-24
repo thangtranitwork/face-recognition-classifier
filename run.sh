@@ -131,72 +131,115 @@ check_env() {
 # ── Main ─────────────────────────────────────────────────────
 print_banner
 
-case "${1:-}" in
-    --help|-h)
-        print_usage
-        ;;
+# ── Argument Parser ─────────────────────────────────────────
+TARGET_DIR=""
+ACTION="dry-run"
+PY_ARGS=()
 
-    --setup)
-        do_setup
-        ;;
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        --setup)
+            do_setup
+            exit 0
+            ;;
+        --apply)
+            ACTION="apply"
+            shift
+            ;;
+        --organize|--move)
+            ACTION="organize"
+            shift
+            ;;
+        --organize-apply|--move-apply)
+            ACTION="organize-apply"
+            shift
+            ;;
+        --cluster)
+            ACTION="cluster"
+            shift
+            ;;
+        --cluster-apply)
+            ACTION="cluster-apply"
+            shift
+            ;;
+        --prepare-test)
+            ACTION="prepare-test"
+            shift
+            ;;
+        --clear-cache)
+            ACTION="clear-cache"
+            shift
+            ;;
+        -d|--dir|--target-dir)
+            TARGET_DIR="$2"
+            PY_ARGS+=("-d" "$2")
+            shift 2
+            ;;
+        *)
+            # Nếu người dùng gõ trực tiếp tên folder, vd: ./run.sh other hoặc ./run.sh --cluster other
+            if [ -z "$TARGET_DIR" ] && [ -d "$SCRIPT_DIR/dataset/$1" -o -d "$1" ]; then
+                TARGET_DIR="$1"
+                PY_ARGS+=("-d" "$1")
+                shift
+            else
+                error "Tùy chọn không hợp lệ: $1"
+                echo ""
+                print_usage
+                exit 1
+            fi
+            ;;
+    esac
+done
 
-    --apply)
-        check_env
+check_env
+
+case "$ACTION" in
+    apply)
         info "Đang tiến hành ĐỔI TÊN file thực sự..."
-        "$PYTHON" "$MAIN" --apply
+        "$PYTHON" "$MAIN" --apply "${PY_ARGS[@]}"
         ;;
 
-    --organize|--move)
-        check_env
+    organize)
         info "Dry-run di chuyển file đã đổi tên..."
-        "$PYTHON" "$ORGANIZE"
+        "$PYTHON" "$ORGANIZE" "${PY_ARGS[@]}"
         ;;
 
-    --organize-apply|--move-apply)
-        check_env
+    organize-apply)
         info "Đang DI CHUYỂN các file đã đổi tên vào folder tương ứng (trừ unknown_*)..."
-        "$PYTHON" "$ORGANIZE" --apply
+        "$PYTHON" "$ORGANIZE" --apply "${PY_ARGS[@]}"
         ;;
 
-    --cluster)
-        check_env
+    cluster)
         info "Dry-run gom nhóm người lạ..."
-        "$PYTHON" "$CLUSTER"
+        "$PYTHON" "$CLUSTER" "${PY_ARGS[@]}"
         ;;
 
-    --cluster-apply)
-        check_env
+    cluster-apply)
         info "Đang GOM NHÓM & TẠO FOLDER NGƯỜI MỚI tự động..."
-        "$PYTHON" "$CLUSTER" --apply
+        "$PYTHON" "$CLUSTER" --apply "${PY_ARGS[@]}"
         ;;
 
-    --prepare-test)
-        check_env
+    prepare-test)
         info "Đang chuyển ảnh mẫu sang thư mục chua_phan_loai để test..."
-        "$PYTHON" "$PREPARE"
+        "$PYTHON" "$PREPARE" "${PY_ARGS[@]}"
         ;;
 
-    --clear-cache)
-        check_env
+    clear-cache)
         info "Xóa cache và chạy lại..."
-        "$PYTHON" "$MAIN" --clear-cache
+        "$PYTHON" "$MAIN" --clear-cache "${PY_ARGS[@]}"
         ;;
 
-    "")
-        check_env
+    dry-run)
         info "Chế độ DRY-RUN (chỉ xem kết quả, không đổi tên)"
         echo ""
-        "$PYTHON" "$MAIN"
+        "$PYTHON" "$MAIN" "${PY_ARGS[@]}"
         echo ""
-        echo -e "${YELLOW}💡 Nếu hài lòng, chạy: ./run.sh --apply${NC}"
-        echo -e "${YELLOW}💡 Để gom nhóm người lạ xuất hiện nhiều lần: ./run.sh --cluster-apply${NC}"
-        echo -e "${YELLOW}💡 Để chuyển file đã đổi tên về đúng folder người: ./run.sh --organize-apply${NC}"
-        ;;
-
-    *)
-        error "Tùy chọn không hợp lệ: $1"
-        echo ""
-        print_usage
-        exit 1
+        echo -e "${YELLOW}💡 Nếu hài lòng, chạy: ./run.sh --apply ${PY_ARGS[*]:-}${NC}"
+        echo -e "${YELLOW}💡 Để gom nhóm người lạ: ./run.sh --cluster-apply ${PY_ARGS[*]:-}${NC}"
+        echo -e "${YELLOW}💡 Để chuyển file về đúng folder người: ./run.sh --organize-apply ${PY_ARGS[*]:-}${NC}"
         ;;
 esac
