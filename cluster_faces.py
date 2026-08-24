@@ -229,14 +229,26 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
                 if clean_name.lower().startswith(f"{unknown_prefix}_"):
                     clean_name = clean_name[len(unknown_prefix) + 1:]
 
-                dest_file = target_dir / f"{folder_name}_{clean_name}"
-                if dest_file.exists():
-                    dest_file = target_dir / f"{folder_name}_{fpath.name}"
+                new_name = f"{folder_name}_{clean_name}"
+                new_path = fpath.parent / new_name
 
-                shutil.move(fpath, dest_file)
-                moved_total += 1
+                # Tránh trùng tên
+                if new_path.exists() and new_path != fpath:
+                    counter = 1
+                    stem = Path(new_name).stem
+                    suffix = Path(new_name).suffix
+                    while new_path.exists():
+                        new_name = f"{stem}_{counter}{suffix}"
+                        new_path = fpath.parent / new_name
+                        counter += 1
 
-            click.echo(f"   ✅ Đã tạo '{folder_name}' & di chuyển {len(cluster_files)} file vào dataset!\n")
+                try:
+                    fpath.rename(new_path)
+                    moved_total += 1
+                except Exception as e:
+                    click.echo(f"  ❌ Lỗi đổi tên {fpath.name}: {e}", err=True)
+
+            click.echo(f"   ✅ Đã tạo folder '{folder_name}' trong dataset & đổi tên {len(cluster_files)} file thành {folder_name}_...\n")
 
         next_idx += 1
 
