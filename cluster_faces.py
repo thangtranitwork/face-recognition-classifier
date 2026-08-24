@@ -116,14 +116,40 @@ def main(config: str, apply: bool, eps: Optional[float], min_samples: Optional[i
         click.echo(f"❌ Thư mục '{unclassified_dir}' không tồn tại.", err=True)
         sys.exit(1)
 
-    # 1. Thu thập các file chưa phân loại (ưu tiên file unknown_ hoặc chưa được gán nhãn người)
-    files = [
-        p for p in unclassified_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in ALL_VALID_EXTENSIONS
-    ]
+    # Lấy danh sách tên những người đã biết trong dataset
+    exclude_dirs = {d.lower() for d in cfg.get("exclude_dirs", [])}
+    exclude_dirs.add(unclassified_name.lower())
+    known_person_names = {
+        d.name.lower() for d in dataset_root.iterdir()
+        if d.is_dir() and d.name.lower() not in exclude_dirs
+    }
+
+    # 1. Chỉ thu thập các file CHƯA phân loại (file unknown_ hoặc chưa được gán nhãn người đã biết)
+    files = []
+    for p in unclassified_dir.iterdir():
+        if not p.is_file() or p.suffix.lower() not in ALL_VALID_EXTENSIONS:
+            continue
+
+        name_lower = p.name.lower()
+
+        # Nếu file đã đổi tên thành người đã biết (ví dụ: binhan_..., low_binhan_...) -> BỎ QUA
+        is_known_classified = False
+        if name_lower.startswith("low_"):
+            is_known_classified = True
+        else:
+            for p_name in known_person_names:
+                if name_lower.startswith(f"{p_name}_"):
+                    is_known_classified = True
+                    break
+
+        if is_known_classified:
+            continue
+
+        files.append(p)
 
     if not files:
-        click.echo(f"⚠️  Không có file nào trong '{unclassified_name}/'")
+        click.echo(f"⚠️  Không có file UNKNOWN nào cần gom nhóm trong '{unclassified_name}/'.")
+        click.echo("💡 Lưu ý: Các file đã nhận diện (như binhan_..., lydao_...) không được gom nhóm.")
         return
 
     click.echo("=" * 60)

@@ -52,8 +52,8 @@ sample_frames_per_video: 12
 # Auto-Clustering (Gom nhóm tự động khuôn mặt người lạ)
 # ============================================================
 
-# Ngưỡng khoảng cách tối đa để gom thành cùng 1 người (0.40 - 0.50)
-cluster_eps: 0.45
+# Ngưỡng khoảng cách tối đa để gom thành cùng 1 người (0.35 - 0.40; càng nhỏ càng chặt)
+cluster_eps: 0.38
 
 # Số lượng ảnh/video tối thiểu để tạo thành 1 nhóm người mới
 cluster_min_samples: 2
