@@ -190,6 +190,7 @@ def main(config: str, target_dir: Optional[str], apply: bool, yes: bool, include
 
                 click.echo(f"   ✅ Đã tạo thư mục 'dataset/{chosen_name}/'")
             else:
+                person_dirs[old_prefix.lower()] = dataset_root / old_prefix
                 click.echo(f"   💡 Chạy với -a để gán tên người thật và tự động tạo thư mục 'dataset/{old_prefix}/'")
 
     click.echo("\n" + "=" * 60)
