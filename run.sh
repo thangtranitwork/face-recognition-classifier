@@ -138,6 +138,15 @@ DIR_ARGS=()
 MODULE_COUNT=0
 
 while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--dir|--target-dir|-dir)
+            TARGET_DIR="$2"
+            DIR_ARGS=("-d" "$2")
+            shift 2
+            continue
+            ;;
+    esac
+
     # Tự động tách các short flags ghép chung (ví dụ: -cao -> -c -a -o)
     if [[ "$1" =~ ^-[a-z]{2,}$ ]] && [[ "$1" != "-cc" ]]; then
         flags="${1#-}"
@@ -193,16 +202,11 @@ while [[ $# -gt 0 ]]; do
             DO_CLEAR_CACHE=true
             shift
             ;;
-        -d|--dir|--target-dir)
-            TARGET_DIR="$2"
-            DIR_ARGS+=("-d" "$2")
-            shift 2
-            ;;
         *)
             # Nếu truyền trực tiếp tên folder (vd: ./run.sh other)
             if [ -z "$TARGET_DIR" ] && [ -d "$SCRIPT_DIR/dataset/$1" -o -d "$1" ]; then
                 TARGET_DIR="$1"
-                DIR_ARGS+=("-d" "$1")
+                DIR_ARGS=("-d" "$1")
                 shift
             else
                 error "Tùy chọn không hợp lệ: $1"

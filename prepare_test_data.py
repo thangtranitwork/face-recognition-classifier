@@ -26,9 +26,10 @@ VALID_EXTENSIONS = {
 
 @click.command()
 @click.option("--config", "-c", default="config.yaml", show_default=True, help="Đường dẫn file config YAML.")
+@click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục đích để chuyển ảnh test (vd: 'other', 'chua_phan_loai').")
 @click.option("--count", "-n", default=2, show_default=True, help="Số ảnh/video lấy từ mỗi thư mục người.")
 @click.option("--copy", is_flag=True, default=False, help="Copy file thay vì di chuyển (move).")
-def main(config: str, count: int, copy: bool):
+def main(config: str, target_dir: str, count: int, copy: bool):
     cfg_path = Path(config)
     if not cfg_path.exists():
         click.echo(f"❌ Không tìm thấy file config: {config}", err=True)
@@ -38,7 +39,7 @@ def main(config: str, count: int, copy: bool):
         cfg = yaml.safe_load(f)
 
     dataset_root = Path(cfg.get("dataset_root", "./dataset")).expanduser().resolve()
-    unclassified_name = cfg.get("unclassified_dir", "chua_phan_loai")
+    unclassified_name = target_dir or cfg.get("unclassified_dir", "chua_phan_loai")
 
     # 1. Kiểm tra backup dir
     backup_dir = dataset_root.parent / "dataset-backup"
