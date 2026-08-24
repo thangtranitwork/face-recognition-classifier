@@ -41,6 +41,15 @@ model: "hog"
 max_images_per_person: 50
 
 # ============================================================
+# Xử lý Video (Frame Sampling)
+# ============================================================
+
+# Số lượng khung hình (frames) lấy ngẫu nhiên/trải đều từ mỗi video để nhận diện
+# Khuyên dùng: 10 - 15 frames (nhanh và đủ chính xác cho video 5s - 5phút)
+sample_frames_per_video: 12
+
+
+# ============================================================
 # Dat ten file - Confidence tiers
 # ============================================================
 

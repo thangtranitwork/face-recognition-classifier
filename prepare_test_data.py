@@ -19,7 +19,10 @@ from pathlib import Path
 import click
 import yaml
 
-VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+VALID_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff",
+    ".mp4", ".avi", ".mov", ".mkv", ".webm"
+}
 
 
 @click.command()

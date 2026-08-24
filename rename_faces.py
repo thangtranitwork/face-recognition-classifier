@@ -152,6 +152,93 @@ def save_cache(cache_path: Path, known_faces: dict, fingerprint: str, logger: lo
 # ─────────────────────────────────────────────
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+VALID_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
+ALL_VALID_EXTENSIONS = VALID_EXTENSIONS | VALID_VIDEO_EXTENSIONS
+
+
+def _extract_frames_from_video(video_path: Path, num_frames: int = 12) -> list[np.ndarray]:
+    """Trích xuất num_frames khung hình trải đều từ video."""
+    try:
+        import cv2
+    except ImportError:
+        return []
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return []
+
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames <= 0:
+        cap.release()
+        return []
+
+    step = max(1, total_frames // num_frames)
+    frame_indices = [i * step for i in range(min(num_frames, total_frames))]
+
+    frames = []
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret and frame is not None:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(rgb_frame)
+
+    cap.release()
+    return frames
+
+
+def recognize_video(
+    video_path: Path,
+    known_faces: dict[str, list],
+    tolerance: float,
+    model: str,
+    unknown_prefix: str,
+    sample_frames: int,
+    logger: logging.Logger,
+) -> tuple[str, str, float]:
+    """
+    Nhận diện khuôn mặt trong video bằng cách trích xuất khung hình và bầu chọn (Majority Voting).
+    """
+    frames = _extract_frames_from_video(video_path, num_frames=sample_frames)
+    if not frames:
+        return unknown_prefix, "không đọc được video / video trống", 0.0
+
+    person_votes: dict[str, list[float]] = {}
+    valid_frames_count = 0
+
+    for frame in frames:
+        locations = face_recognition.face_locations(frame, model=model)
+        if not locations:
+            continue
+        encodings = face_recognition.face_encodings(frame, locations)
+        if not encodings:
+            continue
+
+        valid_frames_count += 1
+        for face_enc in encodings:
+            best_person = None
+            best_distance = float("inf")
+            for person_name, known_encs in known_faces.items():
+                distances = face_recognition.face_distance(known_encs, face_enc)
+                min_dist = float(np.min(distances))
+                if min_dist < best_distance:
+                    best_distance = min_dist
+                    best_person = person_name
+
+            if best_distance <= tolerance:
+                conf = round((1 - best_distance) * 100, 1)
+                person_votes.setdefault(best_person, []).append(conf)
+
+    if not person_votes:
+        return unknown_prefix, f"video ({len(frames)} frames): không nhận diện được ai", 0.0
+
+    top_person, confs = max(person_votes.items(), key=lambda item: (len(item[1]), np.mean(item[1])))
+    avg_conf = round(float(np.mean(confs)), 1)
+    votes_count = len(confs)
+
+    reason = f"video: {votes_count}/{valid_frames_count} frames khớp {top_person} (conf trung bình {avg_conf}%)"
+    return top_person, reason, avg_conf
+
 
 
 def load_known_faces(
@@ -372,25 +459,26 @@ def process_unclassified(
     Returns:
         stats dict với số lượng từng loại kết quả.
     """
-    images = [
+    media_files = [
         p for p in unclassified_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in VALID_EXTENSIONS
+        if p.is_file() and p.suffix.lower() in ALL_VALID_EXTENSIONS
     ]
 
-    if not images:
-        logger.warning(f"⚠️  Không có ảnh nào trong {unclassified_dir}")
+    if not media_files:
+        logger.warning(f"⚠️  Không có ảnh/video nào trong {unclassified_dir}")
         return {}
 
-    logger.info(f"\n📁 Xử lý {len(images)} ảnh trong '{unclassified_dir.name}/'")
+    logger.info(f"\n📁 Xử lý {len(media_files)} file (ảnh/video) trong '{unclassified_dir.name}/'")
     if not apply:
         logger.info("🔍 CHẾ ĐỘ DRY-RUN (chỉ xem kết quả, dùng --apply để thực sự đổi tên)\n")
 
     low_threshold = cfg.get("low_confidence_threshold", 70)
+    sample_frames = cfg.get("sample_frames_per_video", 12)
     stats = {"recognized": 0, "low_confidence": 0, "unknown": 0, "skipped": 0, "error": 0}
     results = []
 
-    for img_path in tqdm(images, desc="Đang nhận diện", unit="ảnh"):
-        original_name = img_path.name
+    for file_path in tqdm(media_files, desc="Đang nhận diện", unit="file"):
+        original_name = file_path.name
 
         # Bỏ qua file đã xử lý
         if is_already_processed(original_name, known_faces, cfg["unknown_prefix"]):
@@ -398,14 +486,25 @@ def process_unclassified(
             stats["skipped"] += 1
             continue
 
-        person, reason, confidence = recognize_person(
-            img_path,
-            known_faces,
-            cfg["tolerance"],
-            cfg["model"],
-            cfg["unknown_prefix"],
-            logger,
-        )
+        if file_path.suffix.lower() in VALID_VIDEO_EXTENSIONS:
+            person, reason, confidence = recognize_video(
+                file_path,
+                known_faces,
+                cfg["tolerance"],
+                cfg["model"],
+                cfg["unknown_prefix"],
+                sample_frames,
+                logger,
+            )
+        else:
+            person, reason, confidence = recognize_person(
+                file_path,
+                known_faces,
+                cfg["tolerance"],
+                cfg["model"],
+                cfg["unknown_prefix"],
+                logger,
+            )
 
         is_unknown = person == cfg["unknown_prefix"]
 
@@ -418,16 +517,16 @@ def process_unclassified(
             name_fmt = cfg["name_format"]
 
         new_name = build_new_name(person, original_name, name_fmt, cfg["unknown_prefix"])
-        new_path = img_path.parent / new_name
+        new_path = file_path.parent / new_name
 
         # Tránh ghi đè file đã tồn tại
-        if new_path.exists() and new_path != img_path:
+        if new_path.exists() and new_path != file_path:
             counter = 1
             stem = Path(new_name).stem
             suffix = Path(new_name).suffix
             while new_path.exists():
                 new_name = f"{stem}_{counter}{suffix}"
-                new_path = img_path.parent / new_name
+                new_path = file_path.parent / new_name
                 counter += 1
 
         results.append({
@@ -452,7 +551,7 @@ def process_unclassified(
         # Thực sự đổi tên
         if apply:
             try:
-                img_path.rename(new_path)
+                file_path.rename(new_path)
             except Exception as e:
                 logger.error(f"  ❌ Lỗi đổi tên {original_name}: {e}")
                 stats["error"] += 1
