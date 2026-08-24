@@ -1,6 +1,6 @@
 # Face Recognition File Renamer
 
-An automated CLI tool that detects faces in unclassified images and renames files based on matched persons using deep learning (`dlib` / `face_recognition`).
+An automated CLI tool that detects faces in unclassified images/videos, auto-clusters unknown faces (DBSCAN), renames files based on matched persons using deep learning (`dlib` / `face_recognition`), and organizes dataset folders.
 
 ---
 
@@ -10,15 +10,19 @@ Organize your dataset folder as shown below:
 
 ```text
 face-recognition-classifier/
-├── rename_faces.py       # Main Python script
+├── rename_faces.py       # Main face recognition & renaming script
+├── cluster_faces.py      # Auto-clustering unknown faces (DBSCAN)
+├── organize_faces.py     # Move renamed files & prompt for new person names
+├── clean_names.py        # Normalize dataset file names to <person_name>_<stt>
+├── prepare_test_data.py  # Reset & prepare test dataset
 ├── config.yaml           # Configuration file
-├── run.sh                # Executable runner script
+├── run.sh                # Flexible CLI runner script
 ├── requirements.txt      # Python dependencies
-└── dataset/              # Your dataset directory (ignored by git)
-    ├── person_A/         # Classifiers for Person A (labeled images)
-    ├── person_B/         # Classifiers for Person B
-    ├── other/            # Excluded directory (configurable)
-    └── chua_phan_loai/   # Target directory containing unclassified images
+└── dataset/              # Dataset directory (ignored by git)
+    ├── binhan/           # Training folder for Person A
+    ├── sontung/          # Training folder for Person B
+    ├── other/            # Custom/excluded directory
+    └── chua_phan_loai/   # Unclassified images/videos
 ```
 
 ---
@@ -34,81 +38,52 @@ chmod +x run.sh
 ./run.sh --setup
 ```
 
-*Or manually install system dependencies & python requirements:*
-
-```bash
-# Ubuntu / Debian
-sudo apt-get install -y cmake libopenblas-dev liblapack-dev
-
-# Virtual Environment & Requirements
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
 ---
 
-## 🚀 Usage
+## 🚀 Flexible CLI & Short Flags
 
-### Preview Mode (Dry-Run)
-Inspect recognition results and proposed file renaming **without modifying any files**:
+The `run.sh` script supports single-letter shorthands, combined flags, and custom target directories:
 
 ```bash
+# Preview face recognition (Dry-Run)
 ./run.sh
-# Or directly via Python:
-.venv/bin/python rename_faces.py
+
+# Apply face recognition renaming
+./run.sh -a
+
+# Auto-cluster unknown faces in chua_phan_loai (Dry-Run)
+./run.sh -c
+
+# Auto-cluster unknown faces and rename files in place
+./run.sh -ca
+
+# Full workflow: Cluster + Apply + Organize (asks for real person names!)
+./run.sh -cao
+
+# Auto-accept default names during organize without prompt (-y)
+./run.sh -caoy
+
+# Run on a custom folder (e.g. 'other' or '/path/to/dir')
+./run.sh -cao -d other
+
+# Normalize file names inside person folders to <name>_<STT> (e.g. binhan_1.jpg, binhan_2.png)
+./run.sh -na
+./run.sh -na -d binhan
 ```
 
-### Apply Renaming
-Execute the actual file renaming:
+### 📋 Short Flags Reference
 
-```bash
-./run.sh --apply
-# Or directly via Python:
-.venv/bin/python rename_faces.py --apply
-```
-
-### Auto-Cluster Unknown Persons
-Group unclassified/unknown faces using DBSCAN clustering and automatically create training folders for new persons (`nguoi_moi_1`, `nguoi_moi_2`...):
-
-```bash
-# Preview clusters (dry-run)
-./run.sh --cluster
-
-# Automatically create new person folders & move grouped files
-./run.sh --cluster-apply
-# Or directly via Python:
-.venv/bin/python cluster_faces.py --apply
-```
-
-### Move Renamed Files to Person Folders (Organize)
-Move successfully classified files from `chua_phan_loai/` to their respective person folders (**excluding `unknown_*` files**):
-
-```bash
-# Preview mode (dry-run)
-./run.sh --organize
-
-# Apply file movement
-./run.sh --organize-apply
-# Or directly via Python:
-.venv/bin/python organize_faces.py --apply
-```
-
-### Prepare Test Images
-Randomly move N sample images from person folders into `chua_phan_loai/` (renamed to `IMG_XXXX`) to test the tool:
-
-```bash
-./run.sh --prepare-test
-# Or directly via Python:
-.venv/bin/python prepare_test_data.py --count 2
-```
-
-### Rebuild Face Cache
-Invalidate cached encodings when adding new training images or folders:
-
-```bash
-./run.sh --clear-cache
-```
+| Short | Full Flag | Description |
+|---|---|---|
+| `-a` | `--apply` | Execute changes (rename, move, create folder) |
+| `-r` | `--rename` | Face recognition & renaming |
+| `-c` | `--cluster` | Auto-cluster unknown faces (DBSCAN) |
+| `-o` / `-m` | `--organize` | Move classified files & prompt for new person names |
+| `-n` | `--clean` / `--norm` | Standardize dataset filenames to `<person>_<index>` |
+| `-y` | `--yes` | Non-interactive auto-accept default names |
+| `-p` | `--prepare-test` | Reset dataset & sample test images into `chua_phan_loai/` |
+| `-d <dir>` | `--dir <dir>` | Specify target directory (`other`, `chua_phan_loai`, etc.) |
+| `-cc` | `--clear-cache` | Clear face encoding cache |
 
 ---
 
@@ -142,7 +117,11 @@ exclude_dirs:
 # Recognition threshold (0.0 - 1.0; lower is stricter)
 tolerance: 0.55
 
-# Maximum sample images encoded per person (optimizes speed for large datasets)
+# DBSCAN clustering threshold (0.35 - 0.40)
+cluster_eps: 0.38
+cluster_min_samples: 2
+
+# Maximum sample images encoded per person
 max_images_per_person: 50
 
 # Confidence threshold (%) to trigger low_ prefix
@@ -153,7 +132,9 @@ low_confidence_threshold: 70
 
 ## ✨ Features
 
+- **Video Recognition Support**: Frame sampling + majority voting for `.mp4`, `.avi`, `.mov`, `.mkv`, `.webm`.
+- **DBSCAN Auto-Clustering**: Groups unidentified faces of new persons appearing multiple times.
+- **Interactive Person Registration**: Prompts user for real names when moving clustered files.
+- **Filename Normalization**: Standardizes dataset files to `<person>_<1,2,3>.<ext>`.
 - **Smart Encoding Cache**: MD5-fingerprinted cache ensures instant startup after initial encoding.
-- **Adaptive Face Sampling**: Evaluates images until target valid face encodings are acquired, skipping images without faces.
 - **Dry-Run Default**: Safe execution mode prevents accidental mass file renaming.
-- **Detailed Logging**: Logs match results, confidence levels, and distance metrics to `rename_log.txt`.

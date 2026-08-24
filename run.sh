@@ -11,6 +11,7 @@ MAIN="$SCRIPT_DIR/rename_faces.py"
 ORGANIZE="$SCRIPT_DIR/organize_faces.py"
 PREPARE="$SCRIPT_DIR/prepare_test_data.py"
 CLUSTER="$SCRIPT_DIR/cluster_faces.py"
+NORMALIZE="$SCRIPT_DIR/clean_names.py"
 CONFIG="$SCRIPT_DIR/config.yaml"
 
 # ── Màu sắc ─────────────────────────────────────────────────
@@ -44,6 +45,7 @@ print_usage() {
     echo "  -r, --rename            Nhận diện & đổi tên ảnh (Mặc định)"
     echo "  -c, --cluster           Gom nhóm tự động khuôn mặt người lạ (DBSCAN)"
     echo "  -o, -m, --organize      Di chuyển các file đã đổi tên về đúng thư mục người"
+    echo "  -n, --clean, --norm     Chuẩn hóa tên file trong thư mục người (thành <tên>_<STT>)"
     echo "  -p, --prepare-test      Reset dataset & lấy ảnh mẫu sang chua_phan_loai để test"
     echo "  -cc, --clear-cache      Xóa cache encodings và build lại từ đầu"
     echo ""
@@ -51,15 +53,15 @@ print_usage() {
     echo "  -a, --apply             Thực sự ĐỔI TÊN / TẠO FOLDER / MOVE (Mặc định là Dry-Run)"
     echo ""
     echo -e "${BOLD}Tham số thư mục:${NC}"
-    echo "  -d, --dir, <tên>        Chỉ định thư mục cần chạy (vd: -d other, -d chua_phan_loai)"
+    echo "  -d, --dir, <tên>        Chỉ định thư mục cần chạy (vd: -d other, -d binhan)"
     echo ""
     echo -e "${BOLD}Ví dụ cú pháp viết tắt siêu ngắn:${NC}"
     echo "  ./run.sh -a                       # Đổi tên thật (-a)"
     echo "  ./run.sh -c                       # Dry-run gom nhóm người lạ (-c)"
     echo "  ./run.sh -ca                      # Gom nhóm người lạ & tạo folder mới (-c -a)"
-    echo "  ./run.sh -cao                     # Gom nhóm người mới + Chuyển file về folder người (-c -a -o)"
-    echo "  ./run.sh -cao -d other            # Chạy gom nhóm & di chuyển trên folder 'other'"
-    echo "  ./run.sh -ao                      # Đổi tên thật & chuyển file về folder người (-a -o)"
+    echo "  ./run.sh -cao                     # Gom nhóm người mới + Chuyển file về folder người"
+    echo "  ./run.sh -na                      # Chuẩn hóa tên file trong dataset thành <tên>_<STT>"
+    echo "  ./run.sh -na -d binhan            # Chuẩn hóa tên file trong folder binhan"
 }
 
 # ── Setup: tạo venv + cài packages ──────────────────────────
@@ -129,6 +131,7 @@ print_banner
 DO_RENAME=false
 DO_CLUSTER=false
 DO_ORGANIZE=false
+DO_NORMALIZE=false
 DO_PREPARE=false
 DO_CLEAR_CACHE=false
 IS_APPLY=false
@@ -195,6 +198,11 @@ while [[ $# -gt 0 ]]; do
             if [ "$1" = "--organize-apply" -o "$1" = "--move-apply" ]; then
                 IS_APPLY=true
             fi
+            MODULE_COUNT=$((MODULE_COUNT + 1))
+            shift
+            ;;
+        --clean|-n|--normalize|--norm)
+            DO_NORMALIZE=true
             MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
@@ -282,6 +290,17 @@ if [ "$DO_ORGANIZE" = true ]; then
         info "🔍 Dry-run DI CHUYỂN file về folder người..."
     fi
     "$PYTHON" "$ORGANIZE" "${APPLY_FLAG[@]}" "${YES_FLAG[@]}" "${DIR_ARGS[@]}"
+    echo ""
+fi
+
+# ── 6. Normalize / Clean dataset file names (tên + STT) ─────
+if [ "$DO_NORMALIZE" = true ]; then
+    if [ "$IS_APPLY" = true ]; then
+        info "🔢 Đang CHUẨN HÓA tên file trong folder (tên + STT)..."
+    else
+        info "🔍 Dry-run CHUẨN HÓA tên file (tên + STT)..."
+    fi
+    "$PYTHON" "$NORMALIZE" "${APPLY_FLAG[@]}" "${DIR_ARGS[@]}"
     echo ""
 fi
 
