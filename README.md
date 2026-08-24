@@ -68,6 +68,28 @@ Execute the actual file renaming:
 .venv/bin/python rename_faces.py --apply
 ```
 
+### Move Renamed Files to Person Folders (Organize)
+Move successfully classified files from `chua_phan_loai/` to their respective person folders (**excluding `unknown_*` files**):
+
+```bash
+# Preview mode (dry-run)
+./run.sh --organize
+
+# Apply file movement
+./run.sh --organize-apply
+# Or directly via Python:
+.venv/bin/python organize_faces.py --apply
+```
+
+### Prepare Test Images
+Randomly move N sample images from person folders into `chua_phan_loai/` (renamed to `IMG_XXXX`) to test the tool:
+
+```bash
+./run.sh --prepare-test
+# Or directly via Python:
+.venv/bin/python prepare_test_data.py --count 2
+```
+
 ### Rebuild Face Cache
 Invalidate cached encodings when adding new training images or folders:
 

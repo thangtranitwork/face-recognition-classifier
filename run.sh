@@ -8,6 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$SCRIPT_DIR/.venv"
 PYTHON="$VENV/bin/python"
 MAIN="$SCRIPT_DIR/rename_faces.py"
+ORGANIZE="$SCRIPT_DIR/organize_faces.py"
+PREPARE="$SCRIPT_DIR/prepare_test_data.py"
 CONFIG="$SCRIPT_DIR/config.yaml"
 
 # ── Màu sắc ─────────────────────────────────────────────────
@@ -28,7 +30,7 @@ die()     { error "$*"; exit 1; }
 print_banner() {
     echo -e "${BOLD}"
     echo "  ╔══════════════════════════════════════════╗"
-    echo "  ║   Face Recognition File Renamer          ║"
+    echo "  ║   Face Recognition Classifier Tool       ║"
     echo "  ╚══════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -37,17 +39,27 @@ print_usage() {
     echo -e "${BOLD}Cách dùng:${NC}"
     echo "  ./run.sh [OPTION]"
     echo ""
-    echo -e "${BOLD}Options:${NC}"
-    echo "  (không có)     Dry-run — xem kết quả, KHÔNG đổi tên"
-    echo "  --apply        Thực sự đổi tên file"
-    echo "  --clear-cache  Xóa cache và build lại"
-    echo "  --setup        Cài đặt dependencies (chỉ cần chạy lần đầu)"
-    echo "  --help         Hiện thông báo này"
+    echo -e "${BOLD}Options cho ĐỔI TÊN (Rename):${NC}"
+    echo "  (không có)        Dry-run — xem trước kết quả đổi tên"
+    echo "  --apply           Thực sự ĐỔI TÊN các file trong chua_phan_loai"
+    echo "  --clear-cache     Xóa cache encodings và build lại"
+    echo ""
+    echo -e "${BOLD}Options cho DI CHUYỂN (Organize / Move):${NC}"
+    echo "  --organize        Dry-run — xem trước việc di chuyển file đã đổi tên"
+    echo "  --organize-apply  Thực sự DI CHUYỂN file đã đổi tên vào đúng folder người (TRỪ unknown_*)"
+    echo ""
+    echo -e "${BOLD}Options cho KIỂM THỬ (Test):${NC}"
+    echo "  --prepare-test    Lấy ngẫu nhiên N ảnh từ dataset chuyển sang chua_phan_loai để test"
+    echo ""
+    echo -e "${BOLD}Hệ thống:${NC}"
+    echo "  --setup           Cài đặt dependencies (chạy lần đầu)"
+    echo "  --help            Hiện thông báo này"
     echo ""
     echo -e "${BOLD}Ví dụ:${NC}"
-    echo "  ./run.sh               # preview kết quả"
-    echo "  ./run.sh --apply       # đổi tên thật"
-    echo "  ./run.sh --clear-cache # build lại cache"
+    echo "  ./run.sh                  # Preview kết quả đổi tên"
+    echo "  ./run.sh --apply          # Đổi tên file thật"
+    echo "  ./run.sh --organize-apply # Chuyển file đã đổi tên vào folder từng người (trừ unknown)"
+    echo "  ./run.sh --prepare-test   # Lấy ngẫu nhiên ảnh để test"
 }
 
 # ── Setup: tạo venv + cài packages ──────────────────────────
@@ -125,8 +137,26 @@ case "${1:-}" in
 
     --apply)
         check_env
-        info "Đang tiến hành đổi tên file thực sự..."
+        info "Đang tiến hành ĐỔI TÊN file thực sự..."
         "$PYTHON" "$MAIN" --apply
+        ;;
+
+    --organize|--move)
+        check_env
+        info "Dry-run di chuyển file đã đổi tên..."
+        "$PYTHON" "$ORGANIZE"
+        ;;
+
+    --organize-apply|--move-apply)
+        check_env
+        info "Đang DI CHUYỂN các file đã đổi tên vào folder tương ứng (trừ unknown_*)..."
+        "$PYTHON" "$ORGANIZE" --apply
+        ;;
+
+    --prepare-test)
+        check_env
+        info "Đang chuyển ảnh mẫu sang thư mục chua_phan_loai để test..."
+        "$PYTHON" "$PREPARE"
         ;;
 
     --clear-cache)
@@ -142,6 +172,7 @@ case "${1:-}" in
         "$PYTHON" "$MAIN"
         echo ""
         echo -e "${YELLOW}💡 Nếu hài lòng, chạy: ./run.sh --apply${NC}"
+        echo -e "${YELLOW}💡 Để chuyển file đã đổi tên về đúng folder người: ./run.sh --organize-apply${NC}"
         ;;
 
     *)
