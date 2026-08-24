@@ -38,33 +38,28 @@ print_banner() {
 
 print_usage() {
     echo -e "${BOLD}Cách dùng:${NC}"
-    echo "  ./run.sh [OPTION]"
+    echo "  ./run.sh [CÁC FLAGS VÀ TÙY CHỌN CHỒNG NHAU]"
     echo ""
-    echo -e "${BOLD}Options cho ĐỔI TÊN (Rename):${NC}"
-    echo "  (không có)        Dry-run — xem trước kết quả đổi tên"
-    echo "  --apply           Thực sự ĐỔI TÊN các file trong chua_phan_loai"
-    echo "  --clear-cache     Xóa cache encodings và build lại"
+    echo -e "${BOLD}Flags tính năng (có thể ghép chung nhiều flags):${NC}"
+    echo "  --rename          Nhận diện & đổi tên ảnh (Mặc định nếu không ghi gì)"
+    echo "  --cluster         Gom nhóm tự động khuôn mặt người lạ (DBSCAN)"
+    echo "  --organize|--move Di chuyển các file đã đổi tên về đúng thư mục người"
+    echo "  --prepare-test    Reset dataset & lấy ảnh mẫu sang chua_phan_loai để test"
+    echo "  --clear-cache     Xóa cache encodings và build lại từ đầu"
     echo ""
-    echo -e "${BOLD}Options cho DI CHUYỂN (Organize / Move):${NC}"
-    echo "  --organize        Dry-run — xem trước việc di chuyển file đã đổi tên"
-    echo "  --organize-apply  Thực sự DI CHUYỂN file đã đổi tên vào đúng folder người (TRỪ unknown_*)"
+    echo -e "${BOLD}Flag thực thi:${NC}"
+    echo "  --apply           Thực sự ĐỔI TÊN / TẠO FOLDER / MOVE (Mặc định là Dry-Run xem thử)"
     echo ""
-    echo -e "${BOLD}Options cho GOM NHÓM NGƯỜI LẠ (Auto-Clustering):${NC}"
-    echo "  --cluster         Dry-run — phân tích & xem các nhóm người lạ xuất hiện nhiều lần"
-    echo "  --cluster-apply   Tự động TẠO FOLDER NGƯỜI MỚI (nguoi_moi_1, 2...) và di chuyển file vào"
+    echo -e "${BOLD}Tham số thư mục:${NC}"
+    echo "  -d, --dir, <tên>  Chỉ định thư mục cần chạy (vd: -d other, -d chua_phan_loai)"
     echo ""
-    echo -e "${BOLD}Options cho KIỂM THỬ (Test):${NC}"
-    echo "  --prepare-test    Reset dataset & lấy ngẫu nhiên N ảnh sang chua_phan_loai để test"
-    echo ""
-    echo -e "${BOLD}Hệ thống:${NC}"
-    echo "  --setup           Cài đặt dependencies (chạy lần đầu)"
-    echo "  --help            Hiện thông báo này"
-    echo ""
-    echo -e "${BOLD}Ví dụ:${NC}"
-    echo "  ./run.sh                  # Preview kết quả đổi tên"
-    echo "  ./run.sh --apply          # Đổi tên file thật"
-    echo "  ./run.sh --cluster-apply  # Gom nhóm người lạ & tự tạo folder mới"
-    echo "  ./run.sh --organize-apply # Chuyển file đã đổi tên vào folder từng người (trừ unknown)"
+    echo -e "${BOLD}Ví dụ ghép lệnh linh hoạt:${NC}"
+    echo "  ./run.sh                              # Dry-run đổi tên trong chua_phan_loai"
+    echo "  ./run.sh --apply                      # Đổi tên thật trong chua_phan_loai"
+    echo "  ./run.sh --cluster                    # Dry-run gom nhóm người lạ trong chua_phan_loai"
+    echo "  ./run.sh --cluster --apply            # Gom nhóm người lạ & tự tạo folder người mới"
+    echo "  ./run.sh --cluster --apply --organize # Gom nhóm người mới + Chuyển file về folder người"
+    echo "  ./run.sh --cluster --apply -d other   # Chạy gom nhóm người lạ trên folder 'other'"
 }
 
 # ── Setup: tạo venv + cài packages ──────────────────────────
@@ -131,10 +126,16 @@ check_env() {
 # ── Main ─────────────────────────────────────────────────────
 print_banner
 
-# ── Argument Parser ─────────────────────────────────────────
+DO_RENAME=false
+DO_CLUSTER=false
+DO_ORGANIZE=false
+DO_PREPARE=false
+DO_CLEAR_CACHE=false
+IS_APPLY=false
 TARGET_DIR=""
-ACTION="dry-run"
-PY_ARGS=()
+DIR_ARGS=()
+
+MODULE_COUNT=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -147,43 +148,49 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --apply)
-            ACTION="apply"
+            IS_APPLY=true
             shift
             ;;
-        --organize|--move)
-            ACTION="organize"
+        --rename)
+            DO_RENAME=true
+            MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --organize-apply|--move-apply)
-            ACTION="organize-apply"
+        --cluster|--cluster-apply)
+            DO_CLUSTER=true
+            if [ "$1" = "--cluster-apply" ]; then
+                IS_APPLY=true
+            fi
+            MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --cluster)
-            ACTION="cluster"
-            shift
-            ;;
-        --cluster-apply)
-            ACTION="cluster-apply"
+        --organize|--move|--organize-apply|--move-apply)
+            DO_ORGANIZE=true
+            if [ "$1" = "--organize-apply" -o "$1" = "--move-apply" ]; then
+                IS_APPLY=true
+            fi
+            MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
         --prepare-test)
-            ACTION="prepare-test"
+            DO_PREPARE=true
+            MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
         --clear-cache)
-            ACTION="clear-cache"
+            DO_CLEAR_CACHE=true
             shift
             ;;
         -d|--dir|--target-dir)
             TARGET_DIR="$2"
-            PY_ARGS+=("-d" "$2")
+            DIR_ARGS+=("-d" "$2")
             shift 2
             ;;
         *)
-            # Nếu người dùng gõ trực tiếp tên folder, vd: ./run.sh other hoặc ./run.sh --cluster other
+            # Nếu truyền trực tiếp tên folder (vd: ./run.sh other)
             if [ -z "$TARGET_DIR" ] && [ -d "$SCRIPT_DIR/dataset/$1" -o -d "$1" ]; then
                 TARGET_DIR="$1"
-                PY_ARGS+=("-d" "$1")
+                DIR_ARGS+=("-d" "$1")
                 shift
             else
                 error "Tùy chọn không hợp lệ: $1"
@@ -195,51 +202,63 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Nếu người dùng không chọn module tính năng nào -> Mặc định là --rename
+if [ "$MODULE_COUNT" -eq 0 ] && [ "$DO_CLEAR_CACHE" = false ]; then
+    DO_RENAME=true
+fi
+
 check_env
 
-case "$ACTION" in
-    apply)
-        info "Đang tiến hành ĐỔI TÊN file thực sự..."
-        "$PYTHON" "$MAIN" --apply "${PY_ARGS[@]}"
-        ;;
+# ── 1. Clear cache nếu được gọi ─────────────────────────────
+if [ "$DO_CLEAR_CACHE" = true ]; then
+    info "🗑️  Xóa cache encodings..."
+    "$PYTHON" "$MAIN" --clear-cache "${DIR_ARGS[@]}"
+fi
 
-    organize)
-        info "Dry-run di chuyển file đã đổi tên..."
-        "$PYTHON" "$ORGANIZE" "${PY_ARGS[@]}"
-        ;;
+# ── 2. Reset / Prepare test data ────────────────────────────
+if [ "$DO_PREPARE" = true ]; then
+    info "🧪 Chuẩn bị dữ liệu kiểm thử..."
+    "$PYTHON" "$PREPARE" "${DIR_ARGS[@]}"
+fi
 
-    organize-apply)
-        info "Đang DI CHUYỂN các file đã đổi tên vào folder tương ứng (trừ unknown_*)..."
-        "$PYTHON" "$ORGANIZE" --apply "${PY_ARGS[@]}"
-        ;;
+APPLY_FLAG=()
+if [ "$IS_APPLY" = true ]; then
+    APPLY_FLAG=("--apply")
+fi
 
-    cluster)
-        info "Dry-run gom nhóm người lạ..."
-        "$PYTHON" "$CLUSTER" "${PY_ARGS[@]}"
-        ;;
+# ── 3. Rename faces ─────────────────────────────────────────
+if [ "$DO_RENAME" = true ]; then
+    if [ "$IS_APPLY" = true ]; then
+        info "✏️  Đang tiến hành ĐỔI TÊN file..."
+    else
+        info "🔍 Dry-run ĐỔI TÊN file..."
+    fi
+    "$PYTHON" "$MAIN" "${APPLY_FLAG[@]}" "${DIR_ARGS[@]}"
+    echo ""
+fi
 
-    cluster-apply)
-        info "Đang GOM NHÓM & TẠO FOLDER NGƯỜI MỚI tự động..."
-        "$PYTHON" "$CLUSTER" --apply "${PY_ARGS[@]}"
-        ;;
+# ── 4. Auto-cluster unknown faces ───────────────────────────
+if [ "$DO_CLUSTER" = true ]; then
+    if [ "$IS_APPLY" = true ]; then
+        info "🤖 Đang GOM NHÓM & TẠO FOLDER NGƯỜI MỚI tự động..."
+    else
+        info "🤖 Dry-run GOM NHÓM người lạ..."
+    fi
+    "$PYTHON" "$CLUSTER" "${APPLY_FLAG[@]}" "${DIR_ARGS[@]}"
+    echo ""
+fi
 
-    prepare-test)
-        info "Đang chuyển ảnh mẫu sang thư mục chua_phan_loai để test..."
-        "$PYTHON" "$PREPARE" "${PY_ARGS[@]}"
-        ;;
+# ── 5. Organize / Move files to person folders ──────────────
+if [ "$DO_ORGANIZE" = true ]; then
+    if [ "$IS_APPLY" = true ]; then
+        info "🚚 Đang DI CHUYỂN các file về đúng folder người (trừ unknown_*)..."
+    else
+        info "🔍 Dry-run DI CHUYỂN file về folder người..."
+    fi
+    "$PYTHON" "$ORGANIZE" "${APPLY_FLAG[@]}" "${DIR_ARGS[@]}"
+    echo ""
+fi
 
-    clear-cache)
-        info "Xóa cache và chạy lại..."
-        "$PYTHON" "$MAIN" --clear-cache "${PY_ARGS[@]}"
-        ;;
-
-    dry-run)
-        info "Chế độ DRY-RUN (chỉ xem kết quả, không đổi tên)"
-        echo ""
-        "$PYTHON" "$MAIN" "${PY_ARGS[@]}"
-        echo ""
-        echo -e "${YELLOW}💡 Nếu hài lòng, chạy: ./run.sh --apply ${PY_ARGS[*]:-}${NC}"
-        echo -e "${YELLOW}💡 Để gom nhóm người lạ: ./run.sh --cluster-apply ${PY_ARGS[*]:-}${NC}"
-        echo -e "${YELLOW}💡 Để chuyển file về đúng folder người: ./run.sh --organize-apply ${PY_ARGS[*]:-}${NC}"
-        ;;
-esac
+if [ "$IS_APPLY" = false ]; then
+    echo -e "${YELLOW}💡 Chế độ DRY-RUN (xem thử). Để thực sự đổi tên/tạo folder/move file, thêm flag --apply${NC}"
+fi
