@@ -38,28 +38,28 @@ print_banner() {
 
 print_usage() {
     echo -e "${BOLD}Cách dùng:${NC}"
-    echo "  ./run.sh [CÁC FLAGS VÀ TÙY CHỌN CHỒNG NHAU]"
+    echo "  ./run.sh [FLAGS]"
     echo ""
-    echo -e "${BOLD}Flags tính năng (có thể ghép chung nhiều flags):${NC}"
-    echo "  --rename          Nhận diện & đổi tên ảnh (Mặc định nếu không ghi gì)"
-    echo "  --cluster         Gom nhóm tự động khuôn mặt người lạ (DBSCAN)"
-    echo "  --organize|--move Di chuyển các file đã đổi tên về đúng thư mục người"
-    echo "  --prepare-test    Reset dataset & lấy ảnh mẫu sang chua_phan_loai để test"
-    echo "  --clear-cache     Xóa cache encodings và build lại từ đầu"
+    echo -e "${BOLD}Flags tính năng (có thể viết tắt & ghép chung):${NC}"
+    echo "  -r, --rename            Nhận diện & đổi tên ảnh (Mặc định)"
+    echo "  -c, --cluster           Gom nhóm tự động khuôn mặt người lạ (DBSCAN)"
+    echo "  -o, -m, --organize      Di chuyển các file đã đổi tên về đúng thư mục người"
+    echo "  -p, --prepare-test      Reset dataset & lấy ảnh mẫu sang chua_phan_loai để test"
+    echo "  -cc, --clear-cache      Xóa cache encodings và build lại từ đầu"
     echo ""
     echo -e "${BOLD}Flag thực thi:${NC}"
-    echo "  --apply           Thực sự ĐỔI TÊN / TẠO FOLDER / MOVE (Mặc định là Dry-Run xem thử)"
+    echo "  -a, --apply             Thực sự ĐỔI TÊN / TẠO FOLDER / MOVE (Mặc định là Dry-Run)"
     echo ""
     echo -e "${BOLD}Tham số thư mục:${NC}"
-    echo "  -d, --dir, <tên>  Chỉ định thư mục cần chạy (vd: -d other, -d chua_phan_loai)"
+    echo "  -d, --dir, <tên>        Chỉ định thư mục cần chạy (vd: -d other, -d chua_phan_loai)"
     echo ""
-    echo -e "${BOLD}Ví dụ ghép lệnh linh hoạt:${NC}"
-    echo "  ./run.sh                              # Dry-run đổi tên trong chua_phan_loai"
-    echo "  ./run.sh --apply                      # Đổi tên thật trong chua_phan_loai"
-    echo "  ./run.sh --cluster                    # Dry-run gom nhóm người lạ trong chua_phan_loai"
-    echo "  ./run.sh --cluster --apply            # Gom nhóm người lạ & tự tạo folder người mới"
-    echo "  ./run.sh --cluster --apply --organize # Gom nhóm người mới + Chuyển file về folder người"
-    echo "  ./run.sh --cluster --apply -d other   # Chạy gom nhóm người lạ trên folder 'other'"
+    echo -e "${BOLD}Ví dụ cú pháp viết tắt siêu ngắn:${NC}"
+    echo "  ./run.sh -a                       # Đổi tên thật (-a)"
+    echo "  ./run.sh -c                       # Dry-run gom nhóm người lạ (-c)"
+    echo "  ./run.sh -ca                      # Gom nhóm người lạ & tạo folder mới (-c -a)"
+    echo "  ./run.sh -cao                     # Gom nhóm người mới + Chuyển file về folder người (-c -a -o)"
+    echo "  ./run.sh -cao -d other            # Chạy gom nhóm & di chuyển trên folder 'other'"
+    echo "  ./run.sh -ao                      # Đổi tên thật & chuyển file về folder người (-a -o)"
 }
 
 # ── Setup: tạo venv + cài packages ──────────────────────────
@@ -138,6 +138,18 @@ DIR_ARGS=()
 MODULE_COUNT=0
 
 while [[ $# -gt 0 ]]; do
+    # Tự động tách các short flags ghép chung (ví dụ: -cao -> -c -a -o)
+    if [[ "$1" =~ ^-[a-z]{2,}$ ]] && [[ "$1" != "-cc" ]]; then
+        flags="${1#-}"
+        shift
+        expanded=()
+        for (( i=0; i<${#flags}; i++ )); do
+            expanded+=("-${flags:$i:1}")
+        done
+        set -- "${expanded[@]}" "$@"
+        continue
+    fi
+
     case "$1" in
         --help|-h)
             print_usage
@@ -147,16 +159,16 @@ while [[ $# -gt 0 ]]; do
             do_setup
             exit 0
             ;;
-        --apply)
+        --apply|-a)
             IS_APPLY=true
             shift
             ;;
-        --rename)
+        --rename|-r)
             DO_RENAME=true
             MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --cluster|--cluster-apply)
+        --cluster|-c|--cluster-apply)
             DO_CLUSTER=true
             if [ "$1" = "--cluster-apply" ]; then
                 IS_APPLY=true
@@ -164,7 +176,7 @@ while [[ $# -gt 0 ]]; do
             MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --organize|--move|--organize-apply|--move-apply)
+        --organize|-o|--move|-m|--organize-apply|--move-apply)
             DO_ORGANIZE=true
             if [ "$1" = "--organize-apply" -o "$1" = "--move-apply" ]; then
                 IS_APPLY=true
@@ -172,12 +184,12 @@ while [[ $# -gt 0 ]]; do
             MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --prepare-test)
+        --prepare-test|-p)
             DO_PREPARE=true
             MODULE_COUNT=$((MODULE_COUNT + 1))
             shift
             ;;
-        --clear-cache)
+        --clear-cache|-cc)
             DO_CLEAR_CACHE=true
             shift
             ;;

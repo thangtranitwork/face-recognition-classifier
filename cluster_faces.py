@@ -103,7 +103,7 @@ def resolve_target_dir(target_dir_str: Optional[str], default_name: str, dataset
 @click.command()
 @click.option("--config", "-c", default="config.yaml", show_default=True, help="Đường dẫn file config YAML.")
 @click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục cần gom nhóm (vd: 'other', 'chua_phan_loai' hoặc đường dẫn bất kỳ).")
-@click.option("--apply", is_flag=True, default=False, help="Thực sự tạo folder người mới và di chuyển file.")
+@click.option("--apply", "-a", is_flag=True, default=False, help="Thực sự tạo folder người mới và di chuyển file.")
 @click.option("--eps", default=None, type=float, help="Override ngưỡng khoảng cách DBSCAN (default trong config).")
 @click.option("--min-samples", default=None, type=int, help="Override số ảnh tối thiểu/nhóm (default trong config).")
 def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[float], min_samples: Optional[int]):

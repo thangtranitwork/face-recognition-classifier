@@ -42,7 +42,7 @@ def resolve_target_dir(target_dir_str: Optional[str], default_name: str, dataset
 @click.command()
 @click.option("--config", "-c", default="config.yaml", show_default=True, help="Đường dẫn file config YAML.")
 @click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục chứa file đã đổi tên (vd: 'other', 'chua_phan_loai').")
-@click.option("--apply", is_flag=True, default=False, help="Thực sự di chuyển file (mặc định là dry-run).")
+@click.option("--apply", "-a", is_flag=True, default=False, help="Thực sự di chuyển file (mặc định là dry-run).")
 @click.option("--include-low", is_flag=True, default=True, help="Di chuyển cả ảnh low_confidence (mặc định: True).")
 def main(config: str, target_dir: Optional[str], apply: bool, include_low: bool):
     cfg_path = Path(config)

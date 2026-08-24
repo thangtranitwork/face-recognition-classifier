@@ -577,7 +577,7 @@ def process_unclassified(
     help="Đường dẫn tới file cấu hình YAML.",
 )
 @click.option(
-    "--apply",
+    "--apply", "-a",
     is_flag=True,
     default=False,
     help="Thực sự đổi tên file (mặc định là dry-run).",
