@@ -22,7 +22,7 @@ from typing import Optional, List, Tuple
 import click
 import yaml
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from tqdm import tqdm
 
 try:
@@ -42,7 +42,13 @@ VALID_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 ALL_VALID_EXTENSIONS = VALID_EXTENSIONS | VALID_VIDEO_EXTENSIONS
 
 
-def _extract_encoding_from_file(file_path: Path, model: str, sample_frames: int) -> Optional[np.ndarray]:
+def _extract_encoding_from_file(
+    file_path: Path,
+    model: str,
+    sample_frames: int,
+    engine: str = "insightface",
+    insightface_model: str = "buffalo_sc"
+) -> Optional[np.ndarray]:
     """Trích xuất 1 encoding đại diện từ ảnh hoặc video."""
     ext = file_path.suffix.lower()
 
@@ -62,6 +68,19 @@ def _extract_encoding_from_file(file_path: Path, model: str, sample_frames: int)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = cap.read()
                 if ret and frame is not None:
+                    if engine == "insightface":
+                        try:
+                            from rename_faces import get_insightface_app
+                            app = get_insightface_app(insightface_model)
+                            if app is not None:
+                                faces = app.get(frame)
+                                if faces:
+                                    cap.release()
+                                    emb = faces[0].embedding
+                                    norm = np.linalg.norm(emb)
+                                    return (emb / norm).astype(np.float32) if norm > 0 else None
+                        except Exception:
+                            pass
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     locs = face_recognition.face_locations(rgb, model=model)
                     if locs:
@@ -74,8 +93,25 @@ def _extract_encoding_from_file(file_path: Path, model: str, sample_frames: int)
             return None
     else:
         try:
-            pil_img = Image.open(file_path).convert("RGB")
+            pil_img = Image.open(file_path)
+            pil_img = ImageOps.exif_transpose(pil_img).convert("RGB")
             img_arr = np.array(pil_img)
+
+            if engine == "insightface":
+                try:
+                    import cv2
+                    from rename_faces import get_insightface_app
+                    app = get_insightface_app(insightface_model)
+                    if app is not None:
+                        img_bgr = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
+                        faces = app.get(img_bgr)
+                        if faces:
+                            emb = faces[0].embedding
+                            norm = np.linalg.norm(emb)
+                            return (emb / norm).astype(np.float32) if norm > 0 else None
+                except Exception:
+                    pass
+
             locs = face_recognition.face_locations(img_arr, model=model)
             if locs:
                 encs = face_recognition.face_encodings(img_arr, locs)
@@ -123,7 +159,10 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
     unknown_prefix = cfg.get("unknown_prefix", "unknown").lower()
     prefix_folder = cfg.get("cluster_prefix", "nguoi_moi")
 
-    dbscan_eps = eps if eps is not None else float(cfg.get("cluster_eps", 0.45))
+    engine = cfg.get("engine", "insightface")
+    insightface_model = cfg.get("insightface_model", "buffalo_sc")
+    metric = "cosine" if engine == "insightface" else "euclidean"
+    dbscan_eps = eps if eps is not None else (0.45 if engine == "insightface" else float(cfg.get("cluster_eps", 0.38)))
     dbscan_min_samples = min_samples if min_samples is not None else int(cfg.get("cluster_min_samples", 2))
 
     # Lấy danh sách tên những người đã biết trong dataset
@@ -167,6 +206,7 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
     click.echo("=" * 60)
     click.echo(f"📌 Mode          : {'APPLY ✏️ (Tạo folder người mới & move)' if apply else 'DRY-RUN 🔍 (Chỉ xem trước)'}")
     click.echo(f"📌 Nguồn         : {unclassified_dir}")
+    click.echo(f"📌 Engine        : {engine} ({insightface_model})")
     click.echo(f"📌 DBSCAN eps    : {dbscan_eps}")
     click.echo(f"📌 Min samples   : {dbscan_min_samples}")
     click.echo("")
@@ -177,7 +217,10 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
     file_paths = []
 
     for fpath in tqdm(files, desc="Encoding", unit="file"):
-        enc = _extract_encoding_from_file(fpath, model=model, sample_frames=sample_frames)
+        enc = _extract_encoding_from_file(
+            fpath, model=model, sample_frames=sample_frames,
+            engine=engine, insightface_model=insightface_model
+        )
         if enc is not None:
             encodings_list.append(enc)
             file_paths.append(fpath)
@@ -188,8 +231,8 @@ def main(config: str, target_dir: Optional[str], apply: bool, eps: Optional[floa
 
     click.echo(f"✅ Trích xuất thành công {len(encodings_list)} khuôn mặt. Đang tiến hành gom nhóm (Clustering)...")
 
-    # 2. Chạy DBSCAN clustering với metric Euclidean
-    clt = DBSCAN(eps=dbscan_eps, min_samples=dbscan_min_samples, metric="euclidean")
+    # 2. Chạy DBSCAN clustering với metric phù hợp
+    clt = DBSCAN(eps=dbscan_eps, min_samples=dbscan_min_samples, metric=metric)
     clt.fit(encodings_list)
 
     labels = clt.labels_

@@ -16,28 +16,37 @@ exclude_dirs:
   - "chua_phan_loai"   # thư mục cần xử lý
   - "khac"             # người khác / không rõ danh tính
   - "other"            # ảnh không phân loại theo người
-  # Thêm tên folder khác nếu cần, ví dụ:
-  # - "events"
-  # - "archive"
-
 # ============================================================
-# Nhận diện khuôn mặt
+# Nhận diện khuôn mặt (Engine & Model)
 # ============================================================
 
-# Ngưỡng nhận diện (0.0 - 1.0)
-# Càng thấp = càng nghiêm ngặt (ít nhận sai, nhưng có thể bỏ sót)
-# Mặc định: 0.55 (chặt hơn default 0.6 của face_recognition)
-tolerance: 0.55
+# Engine nhận diện: "insightface" (RetinaFace + ArcFace, khuyến nghị cho CPU) hoặc "dlib"
+engine: "insightface"
 
-# Model nhận diện: "hog" (nhanh, CPU) hoặc "cnn" (chính xác hơn, cần GPU)
+# Model của InsightFace: "buffalo_sc" (siêu nhẹ, tối ưu CPU ~150MB) hoặc "buffalo_s"
+insightface_model: "buffalo_sc"
+
+# Ngưỡng Cosine Similarity cho InsightFace (0.0 - 1.0; càng cao càng chặt)
+# Điểm similarity cùng 1 người thường: 0.40 - 0.90+
+# Khuyên dùng: 0.35 - 0.40
+cosine_threshold: 0.38
+
+# Ngưỡng chênh lệch Cosine Similarity giữa Candidate #1 và Candidate #2 (Margin check)
+margin_threshold: 0.04
+
+# Ngưỡng nhận diện cho engine dlib legacy (0.0 - 1.0; tolerance càng thấp càng chặt)
+tolerance: 0.57
+
+# Số lượng ảnh tương đồng nhất (Top-K) để tính trung bình
+top_k_neighbors: 3
+
+# Model nhận diện dlib: "hog" (CPU) hoặc "cnn" (GPU)
 model: "hog"
 
+# Số lần jitter khi encode dlib training
+num_jitters: 2
+
 # Số lượng ảnh tối đa lấy từ mỗi folder để làm known faces
-# null = lấy tất cả
-# Với dataset lớn (60 người x vài trăm ảnh):
-#   - 30 anh/nguoi: encode ~1-2 phut, chinh xac tot
-#   - 50 anh/nguoi: encode ~3-5 phut, chinh xac cao hon
-#   - null: rat cham lan dau, nhung cache giai quyet duoc
 max_images_per_person: 50
 
 # ============================================================
@@ -69,7 +78,7 @@ cluster_prefix: "nguoi_moi"
 
 # Nguong confidence THAP (%) - duoi muc nay dung low_confidence_format
 # Vi du: 70 → confidence < 70% → low_j97_IMG_001.jpg
-low_confidence_threshold: 70
+low_confidence_threshold: 45
 
 # Format ten file cho anh nhan dien duoc (confidence >= low_confidence_threshold)
 name_format: "{person}_{original}"
