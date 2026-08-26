@@ -53,10 +53,13 @@ def get_insightface_app(model_name: str = "buffalo_sc") -> Optional[object]:
         return _INSIGHTFACE_APP
 
     try:
+        import warnings
         import insightface
         from insightface.app import FaceAnalysis
         import logging as _logging
         _logging.getLogger('insightface').setLevel(_logging.WARNING)
+        # Sửa FutureWarning từ skimage.transform
+        warnings.filterwarnings('ignore', category=FutureWarning, module='insightface')
 
         app = FaceAnalysis(name=model_name, providers=['CPUExecutionProvider'])
         app.prepare(ctx_id=0, det_size=(640, 640))
@@ -108,8 +111,9 @@ def load_config(config_path: str) -> dict:
 
     # Defaults
     cfg.setdefault("engine", "insightface")
-    cfg.setdefault("insightface_model", "buffalo_sc")
-    cfg.setdefault("cosine_threshold", 0.38)
+    cfg.setdefault("insightface_model", "buffalo_l")
+    cfg.setdefault("cosine_threshold", 0.35)
+    cfg.setdefault("multi_face_strategy", "largest")
     cfg.setdefault("tolerance", 0.57)
     cfg.setdefault("top_k_neighbors", 3)
     cfg.setdefault("margin_threshold", 0.04)
@@ -447,7 +451,10 @@ def _encode_image(
     engine: str = "insightface",
     insightface_model: str = "buffalo_sc"
 ) -> list:
-    """Load ảnh (xử lý xoay EXIF) và trả về list encodings."""
+    """Load ảnh (xử lý xoay EXIF) và trả về list encodings.
+    
+    InsightFace: Lọc face quality theo det_score >= 0.6 khi training.
+    """
     try:
         pil_img = Image.open(img_path)
         pil_img = ImageOps.exif_transpose(pil_img).convert("RGB")
@@ -461,6 +468,10 @@ def _encode_image(
                 faces = app.get(img_bgr)
                 encs = []
                 for face in faces:
+                    # Lọc face chất lượng thấp trong training (det_score < 0.6)
+                    det_score = getattr(face, 'det_score', 1.0)
+                    if det_score < 0.6:
+                        continue
                     emb = face.embedding
                     norm = np.linalg.norm(emb)
                     if norm > 0:
@@ -492,11 +503,13 @@ def recognize_person(
     top_k: int = 3,
     margin_threshold: float = 0.04,
     engine: str = "insightface",
-    insightface_model: str = "buffalo_sc",
-    cosine_threshold: float = 0.38,
+    insightface_model: str = "buffalo_l",
+    cosine_threshold: float = 0.35,
+    multi_face_strategy: str = "largest",
 ) -> tuple[str, str, float]:
     """
     Nhận diện khuôn mặt trong ảnh với InsightFace (ArcFace Cosine Similarity) hoặc dlib.
+    multi_face_strategy: "largest" (chọn mặt lớn nhất) | "reject" (bỏ qua ảnh nhiều mặt)
     """
     try:
         pil_img = Image.open(img_path)
@@ -514,10 +527,21 @@ def recognize_person(
 
             if len(faces) == 0:
                 return unknown_prefix, "không phát hiện khuôn mặt", 0.0
-            if len(faces) > 1:
-                return unknown_prefix, f"có {len(faces)} khuôn mặt trong ảnh", 0.0
 
-            emb = faces[0].embedding
+            # Xử lý nhiều khuôn mặt theo chiến lược
+            if len(faces) > 1:
+                if multi_face_strategy == "largest":
+                    def _bbox_area(face) -> float:
+                        bbox = face.bbox  # [x1, y1, x2, y2]
+                        return float((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
+                    best_face = max(faces, key=_bbox_area)
+                    logger.debug(f"     ℹ️  {img_path.name}: {len(faces)} mặt → chọn mặt lớn nhất (det_score={best_face.det_score:.2f})")
+                else:  # "reject"
+                    return unknown_prefix, f"có {len(faces)} khuôn mặt trong ảnh (dùng multi_face_strategy=largest để tự chọn)", 0.0
+            else:
+                best_face = faces[0]
+
+            emb = best_face.embedding
             norm = np.linalg.norm(emb)
             if norm == 0:
                 return unknown_prefix, "không encode được khuôn mặt", 0.0
@@ -643,8 +667,9 @@ def process_unclassified(
     top_k = cfg.get("top_k_neighbors", 3)
     margin_threshold = cfg.get("margin_threshold", 0.04)
     engine = cfg.get("engine", "insightface")
-    insightface_model = cfg.get("insightface_model", "buffalo_sc")
-    cosine_threshold = cfg.get("cosine_threshold", 0.38)
+    insightface_model = cfg.get("insightface_model", "buffalo_l")
+    cosine_threshold = cfg.get("cosine_threshold", 0.35)
+    multi_face_strategy = cfg.get("multi_face_strategy", "largest")
 
     stats = {"recognized": 0, "low_confidence": 0, "unknown": 0, "skipped": 0, "error": 0}
     results = []
@@ -685,6 +710,7 @@ def process_unclassified(
                 engine=engine,
                 insightface_model=insightface_model,
                 cosine_threshold=cosine_threshold,
+                multi_face_strategy=multi_face_strategy,
             )
 
         is_unknown = person == cfg["unknown_prefix"]

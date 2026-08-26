@@ -23,13 +23,20 @@ exclude_dirs:
 # Engine nhận diện: "insightface" (RetinaFace + ArcFace, khuyến nghị cho CPU) hoặc "dlib"
 engine: "insightface"
 
-# Model của InsightFace: "buffalo_sc" (siêu nhẹ, tối ưu CPU ~150MB) hoặc "buffalo_s"
-insightface_model: "buffalo_sc"
+# Model của InsightFace:
+#   "buffalo_sc" - Nhẹ ~150MB, nhanh, tốt cho thử nghiệm
+#   "buffalo_l"  - Lớn ~450MB, chính xác hơn ~10-15%, vẫn chạy CPU tốt
+insightface_model: "buffalo_l"
 
 # Ngưỡng Cosine Similarity cho InsightFace (0.0 - 1.0; càng cao càng chặt)
-# Điểm similarity cùng 1 người thường: 0.40 - 0.90+
-# Khuyên dùng: 0.35 - 0.40
-cosine_threshold: 0.38
+# buffalo_sc: 0.38; buffalo_l: 0.35 (model lớn nhưng similarity thường cao hơn)
+# Cùng 1 người thường: 0.45 - 0.90+; Khác người: < 0.25
+cosine_threshold: 0.35
+
+# Xử lý khi có nhiều khuôn mặt trong ảnh:
+#   "largest" - Chọn mặt có bbox lớn nhất (nhân vật chính ở gần nhất)
+#   "reject"  - Bỏ qua ảnh có nhiều mặt (hành vi cũ)
+multi_face_strategy: "largest"
 
 # Ngưỡng chênh lệch Cosine Similarity giữa Candidate #1 và Candidate #2 (Margin check)
 margin_threshold: 0.04
