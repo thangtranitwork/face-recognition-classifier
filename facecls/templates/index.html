@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Recognition Studio • Precision Vision AI</title>
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            obsidian: {
+              950: '#060709',
+              900: '#0B0D12',
+              850: '#10131B',
+              800: '#161A24',
+              700: '#1F2432',
+              600: '#2C3446',
+            },
+            accent: {
+              emerald: '#10B981',
+              amber: '#F59E0B',
+              cyan: '#06B6D4',
+              rose: '#F43F5E',
+              indigo: '#6366F1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0B0D12; }
+    ::-webkit-scrollbar-thumb { background: #1F2432; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2C3446; }
+
+    /* Surface tokens */
+    .surface-base { background-color: #08090C; }
+    .surface-card { background-color: #0E1117; border: 1px solid rgba(255, 255, 255, 0.07); }
+    .surface-card-elevated { background-color: #141720; border: 1px solid rgba(255, 255, 255, 0.09); }
+    .double-bezel {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .hud-box {
+      border: 1.5px solid rgba(16, 185, 129, 0.85);
+      background: rgba(16, 185, 129, 0.12);
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+    }
+    .hud-bracket::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px; width: 6px; height: 6px;
+      border-top: 2px solid #10B981; border-left: 2px solid #10B981;
+    }
+    .hud-bracket::after {
+      content: '';
+      position: absolute;
+      bottom: -2px; right: -2px; width: 6px; height: 6px;
+      border-bottom: 2px solid #10B981; border-right: 2px solid #10B981;
+    }
+  </style>
+</head>
+<body class="surface-base text-zinc-100 min-h-screen flex flex-col font-sans antialiased selection:bg-zinc-100 selection:text-zinc-900">
+
+  <!-- Main Shell -->
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar Navigation (Machined Hardware Style) -->
+    <aside class="w-64 bg-[#090B0F] border-r border-white/[0.07] flex flex-col shrink-0 select-none z-20">
+      <!-- App Brand -->
+      <div class="h-16 flex items-center px-5 gap-3 border-b border-white/[0.07]">
+        <div class="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-950 flex items-center justify-center font-bold shadow-md shadow-white/10">
+          <i data-lucide="scan" class="w-4 h-4 stroke-[2.2]"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="font-bold text-xs tracking-wider uppercase text-zinc-100">Face Studio</span>
+          <span class="text-[10px] text-zinc-500 font-mono">ArcFace Vision v2.0</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="layout-grid" class="w-4 h-4 stroke-[1.8] text-zinc-400"></i>
+          <span>Tổng quan</span>
+        </button>
+
+        <button onclick="switchTab('dataset')" id="nav-dataset" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="users" class="w-4 h-4 stroke-[1.8] text-zinc-400"></i>
+          <span>Thư viện Dataset</span>
+        </button>
+
+        <button onclick="switchTab('renamer')" id="nav-renamer" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="fingerprint" class="w-4 h-4 stroke-[1.8] text-emerald-400"></i>
+          <span>Nhận diện & Đổi tên</span>
+        </button>
+
+        <button onclick="switchTab('clustering')" id="nav-clustering" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="shapes" class="w-4 h-4 stroke-[1.8] text-amber-400"></i>
+          <span>Gom nhóm DBSCAN</span>
+        </button>
+
+        <button onclick="switchTab('downloader')" id="nav-downloader" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="cloud-download" class="w-4 h-4 stroke-[1.8] text-cyan-400"></i>
+          <span>Tải ảnh Web & Instagram</span>
+        </button>
+
+        <button onclick="switchTab('playground')" id="nav-playground" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+          <i data-lucide="crosshair" class="w-4 h-4 stroke-[1.8] text-zinc-400"></i>
+          <span>So khớp ảnh đơn</span>
+        </button>
+
+        <div class="pt-3 mt-3 border-t border-white/[0.06]">
+          <button onclick="switchTab('settings')" id="nav-settings" class="nav-item flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+            <i data-lucide="sliders" class="w-4 h-4 stroke-[1.8] text-zinc-400"></i>
+            <span>Cài đặt tham số</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- System Status Bar -->
+      <div class="p-3 border-t border-white/[0.07] bg-[#06080B] text-[11px] text-zinc-400 space-y-1.5 font-mono">
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-1.5 text-zinc-500">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]"></span> Engine
+          </span>
+          <span id="badge-engine" class="text-zinc-300">insightface</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-zinc-500">Model</span>
+          <span id="badge-model" class="text-zinc-300">buffalo_l</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-zinc-500">Cache</span>
+          <span id="badge-cache" class="text-zinc-300">--</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-[#08090C]">
+
+      <!-- Top Header Action Strip -->
+      <header class="h-16 border-b border-white/[0.07] px-6 flex items-center justify-between shrink-0 bg-[#0A0C10]/60 backdrop-blur-md z-10">
+        <div class="flex items-center gap-3">
+          <h2 id="top-title" class="font-semibold text-sm text-zinc-100 tracking-tight">Tổng quan hệ thống</h2>
+          <span id="top-subtitle" class="text-xs text-zinc-500 hidden md:inline">• Trạng thái mô hình và bộ nhớ</span>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <button onclick="runPrepareTestData()" id="btn-quick-prepare" class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-2 transition active:scale-95">
+            <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Tạo data test</span>
+          </button>
+
+          <button onclick="clearEmbeddingCache()" id="btn-quick-cache" class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-2 transition active:scale-95">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-zinc-400"></i>
+            <span>Làm mới cache</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Views Container -->
+      <div id="main-scroll" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+
+        <!-- ============================================================== -->
+        <!-- TAB 1: DASHBOARD                                               -->
+        <!-- ============================================================== -->
+        <section id="view-dashboard" class="tab-view space-y-6">
+          <!-- Metric Bento Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric 1 -->
+            <div class="surface-card rounded-2xl p-5 space-y-2 relative overflow-hidden group hover:border-white/[0.14] transition-all">
+              <div class="flex items-center justify-between text-zinc-400">
+                <span class="text-xs font-medium tracking-wide uppercase text-zinc-500">Người trong Dataset</span>
+                <i data-lucide="users" class="w-4 h-4 text-zinc-400"></i>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-total-persons" class="text-3xl font-bold font-mono tracking-tight text-zinc-100">--</span>
+                <span class="text-xs text-zinc-500 font-medium">thư mục</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Tập dữ liệu nhận diện đã biết</p>
+            </div>
+
+            <!-- Metric 2 -->
+            <div class="surface-card rounded-2xl p-5 space-y-2 relative overflow-hidden group hover:border-white/[0.14] transition-all">
+              <div class="flex items-center justify-between text-zinc-400">
+                <span class="text-xs font-medium tracking-wide uppercase text-zinc-500">Ảnh Huấn Luyện</span>
+                <i data-lucide="image" class="w-4 h-4 text-zinc-400"></i>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-training-images" class="text-3xl font-bold font-mono tracking-tight text-zinc-100">--</span>
+                <span class="text-xs text-zinc-500 font-medium">ảnh</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Đã vector hóa vào cơ sở dữ liệu</p>
+            </div>
+
+            <!-- Metric 3 -->
+            <div class="surface-card rounded-2xl p-5 space-y-2 relative overflow-hidden group hover:border-white/[0.14] transition-all">
+              <div class="flex items-center justify-between text-zinc-400">
+                <span class="text-xs font-medium tracking-wide uppercase text-zinc-500">Chưa Phân Loại</span>
+                <i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-unclassified-count" class="text-3xl font-bold font-mono tracking-tight text-amber-400">--</span>
+                <span class="text-xs text-zinc-500 font-medium">ảnh cần duyệt</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Trong thư mục chua_phan_loai/</p>
+            </div>
+
+            <!-- Metric 4 -->
+            <div class="surface-card rounded-2xl p-5 space-y-2 relative overflow-hidden group hover:border-white/[0.14] transition-all">
+              <div class="flex items-center justify-between text-zinc-400">
+                <span class="text-xs font-medium tracking-wide uppercase text-zinc-500">Ảnh Tải Về</span>
+                <i data-lucide="download" class="w-4 h-4 text-cyan-400"></i>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-download-count" class="text-3xl font-bold font-mono tracking-tight text-cyan-400">--</span>
+                <span class="text-xs text-zinc-500 font-medium">tệp</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Trong thư mục download/</p>
+            </div>
+          </div>
+
+          <!-- Quick Action Banner -->
+          <div class="surface-card-elevated rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <h3 class="text-sm font-semibold text-zinc-100">Bắt đầu quy trình phân loại ảnh tự động</h3>
+              <p class="text-xs text-zinc-400">Quét nhận diện toàn bộ ảnh chưa phân loại bằng ArcFace, gom nhóm người lạ hoặc di chuyển về thư mục tương ứng.</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <button onclick="switchTab('renamer')" class="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs transition active:scale-95 shadow-md flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-zinc-900"></i>
+                <span>Mở Renamer Studio</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 2: DATASET EXPLORER                                        -->
+        <!-- ============================================================== -->
+        <section id="view-dataset" class="tab-view space-y-6 hidden">
+          <!-- Dataset Toolbar -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div class="relative flex-1 max-w-md">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500"></i>
+              <input type="text" id="dataset-search" placeholder="Lọc theo tên người..." oninput="filterPersonsList(this.value)" class="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0E1117] border border-white/[0.08] text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-white/20">
+            </div>
+
+            <div class="flex items-center gap-2.5">
+              <button onclick="openUploadModal('chua_phan_loai')" class="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center gap-2 transition active:scale-95">
+                <i data-lucide="upload" class="w-3.5 h-3.5 text-zinc-400"></i>
+                <span>Tải ảnh lên Test</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Person Cards Grid -->
+          <div id="person-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Person Detail Media Gallery (Overlay Modal) -->
+          <div id="gallery-panel" class="hidden surface-card rounded-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/[0.07] pb-4">
+              <div class="flex items-center gap-3">
+                <button onclick="closeGallery()" class="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition">
+                  <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                </button>
+                <div>
+                  <h3 id="gallery-person-title" class="font-bold text-sm text-zinc-100">--</h3>
+                  <span id="gallery-person-count" class="text-xs text-zinc-500">-- ảnh</span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button onclick="cleanPersonFiles()" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition">
+                  <i data-lucide="sort-asc" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <span>Chuẩn hóa tên (STT)</span>
+                </button>
+                <button onclick="openUploadModal(currentGalleryPerson)" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold flex items-center gap-1.5 transition">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Thêm ảnh</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="gallery-images-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 3: RENAMER & SCANNER                                       -->
+        <!-- ============================================================== -->
+        <section id="view-renamer" class="tab-view space-y-6 hidden">
+          <!-- Control Command Header -->
+          <div class="surface-card rounded-2xl p-6 space-y-4">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <h3 class="font-bold text-sm text-zinc-100">Nhận diện & Đổi tên khuôn mặt (Renamer)</h3>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">InsightFace ArcFace</span>
+                </div>
+                <p class="text-xs text-zinc-400">Quét ảnh trong <code class="text-zinc-300 font-mono">dataset/chua_phan_loai/</code>, đối chiếu vector ArcFace 512-D và gán nhãn chính xác theo thời gian thực.</p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5">
+                <label class="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none mr-2">
+                  <input type="checkbox" id="scan-force-check" class="w-3.5 h-3.5 rounded bg-[#090B0F] border-white/20 text-emerald-500 focus:ring-0">
+                  <span>Quét lại toàn bộ (Force)</span>
+                </label>
+
+                <button onclick="runScan(false)" id="btn-scan" class="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.09] text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-2 transition active:scale-95">
+                  <i data-lucide="eye" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <span>Quét xem trước (Dry-Run)</span>
+                </button>
+
+                <button onclick="runScan(true)" id="btn-apply-rename" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold flex items-center gap-2 transition active:scale-95 shadow-md shadow-emerald-500/20">
+                  <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                  <span>Thực sự Đổi tên (Apply)</span>
+                </button>
+
+                <button onclick="cancelScan()" id="btn-scan-cancel" class="hidden px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center gap-2 transition active:scale-95 shadow-md shadow-rose-500/10 animate-pulse">
+                  <i data-lucide="square" class="w-3.5 h-3.5 fill-current text-rose-400"></i>
+                  <span>Dừng Quét</span>
+                </button>
+
+                <button onclick="runOrganizeFiles()" id="btn-organize" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-2 transition active:scale-95 border border-white/[0.08]">
+                  <i data-lucide="folder-output" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <span>Di chuyển về folder người</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Real-time Progress HUD Box -->
+            <div id="scan-progress-box" class="hidden p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+              <div class="flex items-center justify-between text-xs font-mono">
+                <div class="flex items-center gap-2 text-zinc-200">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#10B981]"></span>
+                  <span id="scan-progress-status">Đang khởi chạy luồng quét...</span>
+                </div>
+                <span id="scan-progress-counter" class="text-zinc-400 font-bold">0 / --</span>
+              </div>
+              <div class="w-full bg-black/50 h-1.5 rounded-full overflow-hidden border border-white/[0.04]">
+                <div id="scan-progress-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full w-0 transition-all duration-200"></div>
+              </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div id="scan-stats-bar" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-white/[0.06]">
+              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                <span class="text-xs text-zinc-400">Nhận diện khớp</span>
+                <span id="scan-stat-rec" class="font-mono font-bold text-emerald-400 text-sm">0</span>
+              </div>
+              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                <span class="text-xs text-zinc-400">Độ tin cậy thấp (&lt;45%)</span>
+                <span id="scan-stat-low" class="font-mono font-bold text-amber-400 text-sm">0</span>
+              </div>
+              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                <span class="text-xs text-zinc-400">Người lạ (Unknown)</span>
+                <span id="scan-stat-unk" class="font-mono font-bold text-rose-400 text-sm">0</span>
+              </div>
+              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                <span class="text-xs text-zinc-400">Đã gắn nhãn trước</span>
+                <span id="scan-stat-skip" class="font-mono font-bold text-cyan-400 text-sm">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results Grid (Double-Bezel High End Cards) -->
+          <div id="scan-results-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div class="col-span-full py-16 text-center text-xs text-zinc-500">
+              Bấm <span class="text-zinc-300 font-semibold">"Quét xem trước (Dry-Run)"</span> để bắt đầu phân tích khuôn mặt theo thời gian thực.
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 4: AUTO-CLUSTERING (DBSCAN)                                -->
+        <!-- ============================================================== -->
+        <section id="view-clustering" class="tab-view space-y-6 hidden">
+          <div class="surface-card rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-sm text-zinc-100">Gom nhóm tự động khuôn mặt người lạ (DBSCAN)</h3>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">Density-Based Clustering</span>
+              </div>
+              <p class="text-xs text-zinc-400">Tự động phát hiện các nhóm khuôn mặt người lạ lặp lại nhiều lần và gom thành các cụm người mới.</p>
+            </div>
+            <button onclick="runClustering()" id="btn-start-cluster" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-2 transition active:scale-95 shadow-md shadow-amber-500/20">
+              <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+              <span>Khởi chạy Gom nhóm</span>
+            </button>
+          </div>
+
+          <div id="clustering-container" class="space-y-6">
+            <div class="py-16 text-center text-xs text-zinc-500">
+              Bấm "Khởi chạy Gom nhóm" để thuật toán phân tích các khuôn mặt chưa phân loại.
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 5: DOWNLOADER (WEB & INSTAGRAM)                            -->
+        <!-- ============================================================== -->
+        <section id="view-downloader" class="tab-view space-y-6 hidden">
+          <div class="surface-card rounded-2xl p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
+              <div class="space-y-1">
+                <h3 class="font-bold text-sm text-zinc-100">Thu thập & Tải ảnh khuôn mặt</h3>
+                <p class="text-xs text-zinc-400">Tự động cào ảnh chân dung sắc nét từ Web và Instagram Profile kèm bộ lọc mỏ neo nhận diện chuẩn.</p>
+              </div>
+
+              <!-- Source Selector: Web vs Instagram vs Facebook -->
+              <div class="flex items-center p-1 rounded-xl bg-black/40 border border-white/[0.08] text-xs">
+                <button type="button" onclick="setDownloadMode('web')" id="mode-btn-web" class="px-3 py-1.5 rounded-lg font-medium transition text-zinc-100 bg-white/[0.1] shadow-sm flex items-center gap-1.5">
+                  <i data-lucide="globe" class="w-3.5 h-3.5 text-cyan-400"></i>
+                  <span>Web Search</span>
+                </button>
+                <button type="button" onclick="setDownloadMode('instagram')" id="mode-btn-ig" class="px-3 py-1.5 rounded-lg font-medium transition text-zinc-400 hover:text-white flex items-center gap-1.5">
+                  <i data-lucide="instagram" class="w-3.5 h-3.5 text-rose-400"></i>
+                  <span>Instagram (@user)</span>
+                </button>
+                <button type="button" onclick="setDownloadMode('facebook')" id="mode-btn-fb" class="px-3 py-1.5 rounded-lg font-medium transition text-zinc-400 hover:text-white flex items-center gap-1.5">
+                  <i data-lucide="facebook" class="w-3.5 h-3.5 text-blue-400"></i>
+                  <span>Facebook</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Download Form Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <!-- Query / URL Input -->
+              <div class="md:col-span-6 space-y-1.5">
+                <label id="dl-query-label" class="block text-xs font-medium text-zinc-300">Từ khóa tìm kiếm / Link Profile hoặc Video / Highlight</label>
+                <div class="relative">
+                  <input type="text" id="dl-query" placeholder="Ví dụ: Taylor Swift, https://www.facebook.com/..., @lhtm080104..." oninput="handleQueryInput(this.value)" class="w-full px-3.5 py-2.5 rounded-xl bg-[#090B0F] border border-white/[0.08] text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-white/20 font-sans">
+                  <span id="dl-ig-badge" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/10 text-rose-400 border border-rose-500/20">Instagram</span>
+                  <span id="dl-fb-badge" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">Facebook</span>
+                  <span id="dl-vid-badge" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20">Video/Story</span>
+                </div>
+              </div>
+
+              <!-- Dedicated Person Name / Destination Folder Input -->
+              <div class="md:col-span-6 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-medium text-zinc-300">Tên người / Thư mục lưu riêng</label>
+                  <span class="text-[10px] text-zinc-500 font-mono">Tự gợi ý hoặc nhập tự do</span>
+                </div>
+                <div class="relative">
+                  <input type="text" id="dl-person-name" placeholder="Ví dụ: huynh_giang, lhtm080104, sontung..." oninput="handlePersonNameInput(this.value)" class="w-full px-3.5 py-2.5 rounded-xl bg-[#090B0F] border border-white/[0.08] text-xs font-mono text-emerald-300 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/40">
+                  <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs pointer-events-none">📁</span>
+                </div>
+              </div>
+
+              <!-- Destination Mode Selector -->
+              <div class="md:col-span-6 space-y-1.5">
+                <label class="block text-xs font-medium text-zinc-300">Vị trí lưu ảnh đích</label>
+                <select id="dl-dest-mode" onchange="handleDestModeChange(this.value)" class="w-full px-3.5 py-2.5 rounded-xl bg-[#090B0F] border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/20">
+                  <option value="download_person" selected>📁 download/{tên_người}/ (Thư mục download riêng)</option>
+                  <option value="dataset_person">👤 dataset/{tên_người}/ (Thêm thẳng vào tập huấn luyện)</option>
+                  <option value="chua_phan_loai">🧪 dataset/chua_phan_loai/ (Tập test để quét)</option>
+                  <option value="custom">✏️ Nhập đường dẫn thư mục tùy chọn...</option>
+                </select>
+              </div>
+
+              <!-- Image Count & All Mode -->
+              <div class="md:col-span-6 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-medium text-zinc-300">Số lượng ảnh cần tải</label>
+                  <label id="dl-all-label" class="hidden items-center gap-1.5 text-[11px] text-rose-400 cursor-pointer select-none font-medium hover:text-rose-300 transition" title="Tự động duyệt và tải toàn bộ ảnh/album trên profile đến khi hết">
+                    <input type="checkbox" id="dl-all-check" onchange="toggleDownloadAll(this.checked)" class="w-3.5 h-3.5 rounded bg-[#090B0F] border-rose-500/40 text-rose-500 focus:ring-0">
+                    <span>Tải hết profile</span>
+                  </label>
+                </div>
+                <div class="relative">
+                  <input type="number" id="dl-count" value="10" min="1" max="1000" class="w-full px-3.5 py-2.5 rounded-xl bg-[#090B0F] border border-white/[0.08] text-xs font-mono text-zinc-100 focus:outline-none focus:border-white/20">
+                  <span id="dl-count-all-badge" class="hidden absolute inset-0 bg-[#090B0F] border border-rose-500/40 rounded-xl px-3.5 py-2 text-xs font-mono text-rose-300 flex items-center justify-between pointer-events-none">
+                    <span class="font-bold flex items-center gap-1">♾️ Toàn bộ</span>
+                    <span class="text-[10px] text-rose-400/80 font-mono">Đến khi hết bài đăng</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Custom Path Input (Conditional) -->
+              <div id="dl-custom-path-wrap" class="md:col-span-12 hidden space-y-1.5 pt-1">
+                <label class="block text-xs font-medium text-amber-400">Đường dẫn thư mục tùy chỉnh</label>
+                <input type="text" id="dl-custom-path" oninput="updateDestPreview()" placeholder="Ví dụ: download/taylor_swift, my_custom_folder, dataset/my_person..." class="w-full px-3.5 py-2 rounded-xl bg-[#090B0F] border border-amber-500/30 text-xs font-mono text-zinc-200 focus:outline-none focus:border-amber-400">
+                <p class="text-[11px] text-zinc-500">Đường dẫn tương đối từ gốc dự án hoặc đường dẫn tuyệt đối.</p>
+              </div>
+
+              <!-- Live Destination Preview -->
+              <div class="md:col-span-12 flex items-center justify-between px-3.5 py-2 rounded-xl bg-black/30 border border-white/[0.05] text-[11px] font-mono">
+                <div class="flex items-center gap-2 truncate">
+                  <span class="text-zinc-500">📍 Đường dẫn lưu thực tế:</span>
+                  <span id="dl-dest-preview-label" class="text-emerald-400 font-semibold truncate">download/face/</span>
+                </div>
+                <span class="text-zinc-500 text-[10px] hidden sm:inline">Tiền tố file: <span id="dl-prefix-preview" class="text-cyan-300">face_0001.jpg</span></span>
+              </div>
+            </div>
+
+            <!-- Filter Option & Launch Button -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-white/[0.06]">
+              <div class="flex flex-wrap items-center gap-4">
+                <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
+                  <input type="checkbox" id="dl-same-person" checked class="w-4 h-4 rounded bg-[#090B0F] border-white/20 text-emerald-500 focus:ring-0">
+                  <span>Bật xác thực mỏ neo ArcFace</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-purple-300 cursor-pointer select-none" title="Tải Video/Reels/Highlights đã xác thực đúng khuôn mặt">
+                  <input type="checkbox" id="dl-include-videos" checked class="w-4 h-4 rounded bg-[#090B0F] border-purple-500/40 text-purple-500 focus:ring-0">
+                  <span>Tải Video/Highlights (.mp4)</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none" title="Trích xuất và lưu cả các frame ảnh riêng lẻ từ video">
+                  <input type="checkbox" id="dl-extract-frames" class="w-4 h-4 rounded bg-[#090B0F] border-white/20 text-zinc-400 focus:ring-0">
+                  <span>Lưu cả frame ảnh từ video</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-sky-300 cursor-pointer select-none" title="Tự động phát hiện video chỉ có 1 ảnh tĩnh ghép nhạc, bỏ qua lưu video MP4 và chụp 1 ảnh JPG sắc nét để tiết kiệm dung lượng">
+                  <input type="checkbox" id="dl-skip-static-video" checked class="w-4 h-4 rounded bg-[#090B0F] border-sky-500/40 text-sky-500 focus:ring-0">
+                  <span>Chuyển video 1 ảnh thành ảnh chụp</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-amber-300/90 cursor-pointer select-none" title="Xóa các ảnh cũ trong thư mục đích trước khi tải đợt mới để tránh lẫn lộn">
+                  <input type="checkbox" id="dl-clean-target" class="w-4 h-4 rounded bg-[#090B0F] border-amber-500/30 text-amber-500 focus:ring-0">
+                  <span>Xóa ảnh cũ trong thư mục</span>
+                </label>
+              </div>
+
+              <button onclick="startDownloadStream()" id="btn-start-dl" class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-bold flex items-center gap-2 transition active:scale-95 shadow-md">
+                <i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i>
+                <span>Bắt đầu Thu Thập</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Download Live Stream Progress & Gallery -->
+          <div id="dl-stream-panel" class="hidden surface-card rounded-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-white/[0.06] pb-3">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#06B6D4]"></span>
+                <span id="dl-stream-status" class="text-xs font-medium text-zinc-200 font-mono">Đang khởi tạo tiến trình...</span>
+              </div>
+              
+              <div class="flex items-center gap-3">
+                <span id="dl-stream-counter" class="text-xs font-mono font-bold text-zinc-400">0 / 10</span>
+                <button onclick="cancelDownload()" id="btn-stop-dl" class="hidden px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95">
+                  <i data-lucide="square" class="w-3 h-3 fill-current text-rose-400"></i>
+                  <span>Dừng Tải</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-black/40 h-1.5 rounded-full overflow-hidden border border-white/[0.04]">
+              <div id="dl-stream-bar" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+            </div>
+
+            <!-- Target destination label -->
+            <div class="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5">
+              <span>Thư mục đích:</span>
+              <span id="dl-stream-dest-label" class="text-zinc-300">--</span>
+            </div>
+
+            <!-- Section 1: Discovered Potential / Candidate Images Real-Time Grid -->
+            <div class="space-y-2 pt-2 border-t border-white/[0.06]">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#06B6D4]"></span>
+                  <h4 class="text-xs font-bold text-zinc-200">Ảnh tiềm năng đang quét & kiểm tra (<span id="dl-candidates-count" class="font-mono text-cyan-400">0</span>)</h4>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500">Hiển thị trực tiếp ảnh bài viết Instagram & Web</span>
+              </div>
+
+              <div id="dl-candidates-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-72 overflow-y-auto p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+                <!-- Candidate cards populate here in real-time -->
+              </div>
+            </div>
+
+            <!-- Section 2: Saved Verified Images Grid -->
+            <div class="space-y-2 pt-3 border-t border-white/[0.06]">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981]"></span>
+                  <h4 class="text-xs font-bold text-zinc-200">Ảnh đã kiểm định & lưu trữ (<span id="dl-saved-count" class="font-mono text-emerald-400">0</span>)</h4>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500">Mỏ neo ArcFace cùng một người</span>
+              </div>
+
+              <div id="dl-stream-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                <!-- Verified saved cards populate here -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 6: PLAYGROUND (Single Face Inspector)                      -->
+        <!-- ============================================================== -->
+        <section id="view-playground" class="tab-view space-y-6 hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Upload Box -->
+            <div class="lg:col-span-5 surface-card rounded-2xl p-6 space-y-4">
+              <h3 class="font-bold text-sm text-zinc-100">So khớp ảnh đơn</h3>
+              <p class="text-xs text-zinc-400">Tải lên một bức ảnh bất kỳ từ máy tính để phát hiện khuôn mặt và so sánh độ tương đồng sinh trắc với toàn bộ dataset.</p>
+
+              <div id="playground-dropzone" onclick="document.getElementById('playground-file').click()" class="border-2 border-dashed border-white/[0.1] hover:border-white/20 rounded-2xl h-64 flex flex-col items-center justify-center cursor-pointer transition bg-white/[0.01]">
+                <i data-lucide="image-plus" class="w-8 h-8 text-zinc-600 mb-2"></i>
+                <span class="text-xs font-medium text-zinc-300">Chọn ảnh hoặc kéo-thả vào đây</span>
+                <span class="text-[11px] text-zinc-500 mt-0.5">JPG, PNG, WEBP</span>
+                <input type="file" id="playground-file" accept="image/*" class="hidden" onchange="handlePlaygroundUpload(event)">
+              </div>
+
+              <div id="playground-preview-box" class="hidden relative rounded-xl overflow-hidden bg-black/50 max-h-96 flex items-center justify-center">
+                <img id="playground-preview-img" src="" class="max-h-96 object-contain w-full">
+                <canvas id="playground-canvas" class="absolute inset-0 pointer-events-none w-full h-full"></canvas>
+              </div>
+            </div>
+
+            <!-- Match Results Panel -->
+            <div class="lg:col-span-7 surface-card rounded-2xl p-6 space-y-4">
+              <h3 class="font-bold text-sm text-zinc-100">Kết quả phân tích sinh trắc học</h3>
+              <div id="playground-results" class="text-xs text-zinc-500 py-16 text-center">
+                Chưa có ảnh nào được tải lên để so khớp.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- TAB 7: SETTINGS                                                -->
+        <!-- ============================================================== -->
+        <section id="view-settings" class="tab-view space-y-6 hidden">
+          <div class="surface-card rounded-2xl p-6 max-w-2xl space-y-6">
+            <div class="space-y-1 border-b border-white/[0.06] pb-4">
+              <h3 class="font-bold text-sm text-zinc-100">Cấu hình mô hình nhận diện</h3>
+              <p class="text-xs text-zinc-400">Các tham số này điều khiển độ nhạy của ArcFace và thuật toán DBSCAN.</p>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="text-xs font-medium text-zinc-300">Ngưỡng Cosine Similarity (Threshold)</label>
+                  <span id="label-cosine" class="font-mono text-xs text-emerald-400 font-bold">0.35</span>
+                </div>
+                <input type="range" id="setting-cosine" min="0.2" max="0.7" step="0.01" value="0.35" oninput="updateSettingLabel('cosine', this.value)" class="w-full accent-zinc-200">
+                <p class="text-[11px] text-zinc-500 mt-1">Càng cao thì nhận diện càng khắt khe. Cùng 1 người thông thường từ 0.40 - 0.90+.</p>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="text-xs font-medium text-zinc-300">Chất lượng phát hiện RetinaFace (det_thresh)</label>
+                  <span id="label-det" class="font-mono text-xs text-emerald-400 font-bold">0.60</span>
+                </div>
+                <input type="range" id="setting-det" min="0.3" max="0.9" step="0.05" value="0.6" oninput="updateSettingLabel('det', this.value)" class="w-full accent-zinc-200">
+                <p class="text-[11px] text-zinc-500 mt-1">Ngưỡng loại bỏ các khuôn mặt mờ hoặc kích thước quá nhỏ.</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-zinc-300 mb-1.5">Chiến lược khi ảnh có nhiều khuôn mặt</label>
+                <select id="setting-strategy" class="w-full px-3.5 py-2 text-xs rounded-xl bg-[#090B0F] border border-white/[0.08] text-zinc-200 focus:outline-none">
+                  <option value="largest">largest (Chọn khuôn mặt có diện tích lớn nhất ở gần nhất)</option>
+                  <option value="reject">reject (Bỏ qua ảnh có nhiều người)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-white/[0.06] flex justify-end">
+              <button onclick="saveSettings()" class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-bold transition active:scale-95 shadow-md">
+                Lưu cấu hình
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Upload Modal -->
+  <div id="upload-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="surface-card bg-[#0D1016] p-6 rounded-2xl w-full max-w-md border border-white/[0.1] space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/[0.06] pb-3">
+        <h4 class="font-bold text-zinc-100 text-sm">Tải ảnh lên</h4>
+        <button onclick="closeUploadModal()" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div>
+        <label class="block text-xs text-zinc-400 mb-1.5">Thư mục đích</label>
+        <input type="text" id="upload-target-input" class="w-full px-3 py-2 text-xs font-mono rounded-xl bg-black/40 border border-white/[0.08] text-zinc-300" readonly>
+      </div>
+      <div>
+        <label class="block text-xs text-zinc-400 mb-1.5">Chọn tệp ảnh</label>
+        <input type="file" id="upload-file-input" multiple accept="image/*" class="w-full text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/[0.08] file:text-zinc-200 hover:file:bg-white/[0.12]">
+      </div>
+      <div class="pt-3 border-t border-white/[0.06] flex justify-end gap-2">
+        <button onclick="closeUploadModal()" class="px-4 py-2 rounded-xl text-xs text-zinc-400 hover:text-white">Hủy</button>
+        <button onclick="submitUpload()" id="btn-submit-upload" class="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition">Tải lên</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Application Logic -->
+  <script>
+    let currentGalleryPerson = '';
+    let currentDownloadMode = 'web';
+
+    // Toast Notification System
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border text-xs font-medium shadow-2xl flex items-center gap-2.5 transition-all duration-300 transform translate-y-2 opacity-0`;
+      
+      if (type === 'success') {
+        toast.className += ' bg-[#0E1B15] border-emerald-500/30 text-emerald-300';
+        toast.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> <span>${message}</span>`;
+      } else if (type === 'error') {
+        toast.className += ' bg-[#1C1014] border-rose-500/30 text-rose-300';
+        toast.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400"></i> <span>${message}</span>`;
+      } else {
+        toast.className += ' bg-[#121620] border-white/10 text-zinc-200';
+        toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-zinc-400"></i> <span>${message}</span>`;
+      }
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.remove('bg-white/[0.08]', 'text-white', 'font-semibold');
+        el.classList.add('text-zinc-400');
+      });
+
+      const activeView = document.getElementById(`view-${tabId}`);
+      const activeNav = document.getElementById(`nav-${tabId}`);
+      if (activeView) activeView.classList.remove('hidden');
+      if (activeNav) {
+        activeNav.classList.add('bg-white/[0.08]', 'text-white', 'font-semibold');
+        activeNav.classList.remove('text-zinc-400');
+      }
+
+      const titles = {
+        dashboard: ['Tổng quan hệ thống', 'Trạng thái mô hình và dữ liệu'],
+        dataset: ['Thư viện Dataset', 'Quản lý kho dữ liệu khuôn mặt đã biết'],
+        renamer: ['Nhận diện & Đổi tên', 'Quét ảnh chưa phân loại theo mô hình ArcFace'],
+        clustering: ['Gom nhóm người lạ', 'Thuật toán mật độ DBSCAN tự động'],
+        downloader: ['Thu thập & Tải ảnh', 'Tải ảnh chất lượng cao từ Web và Instagram'],
+        playground: ['So khớp ảnh đơn', 'Phân tích sinh trắc học và top độ tương đồng'],
+        settings: ['Cài đặt tham số', 'Tinh chỉnh ngưỡng ArcFace và RetinaFace'],
+      };
+
+      if (titles[tabId]) {
+        document.getElementById('top-title').innerText = titles[tabId][0];
+        document.getElementById('top-subtitle').innerText = `• ${titles[tabId][1]}`;
+      }
+
+      if (tabId === 'dashboard') loadStats();
+      if (tabId === 'dataset') loadPersons();
+      if (tabId === 'settings') loadSettings();
+      if (tabId === 'renamer') {
+        // Run light preview scan automatically if empty
+        const grid = document.getElementById('scan-results-grid');
+        if (grid.children.length <= 1) {
+          runScan(false);
+        }
+      }
+    }
+
+    // Image Error Handler (Prevents ugly browser broken image icon)
+    function handleImgError(img) {
+      img.onerror = null;
+      img.style.display = 'none';
+      img.classList.add('hidden');
+      const container = img.parentElement;
+      if (container) {
+        const fallback = container.querySelector('.img-fallback');
+        if (fallback) {
+          fallback.classList.remove('hidden');
+          fallback.style.display = 'flex';
+        }
+      }
+    }
+
+    // STATS LOADER
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        document.getElementById('stat-total-persons').innerText = data.total_persons;
+        document.getElementById('stat-training-images').innerText = data.total_training_images;
+        document.getElementById('stat-unclassified-count').innerText = data.unclassified_count;
+        document.getElementById('stat-download-count').innerText = data.download_count;
+
+        document.getElementById('badge-engine').innerText = data.engine;
+        document.getElementById('badge-model').innerText = data.model;
+        document.getElementById('badge-cache').innerText = `${data.cache_entries} vectors`;
+      } catch (err) {
+        console.error('Lỗi tải thống kê:', err);
+      }
+    }
+
+    // DATASET TAB
+    let allPersons = [];
+    async function loadPersons() {
+      const grid = document.getElementById('person-grid');
+      grid.innerHTML = '<div class="col-span-full py-12 text-center text-xs text-zinc-500">Đang nạp danh sách...</div>';
+      try {
+        const res = await fetch('/api/persons');
+        allPersons = await res.json();
+        renderPersons(allPersons);
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-full py-12 text-center text-xs text-rose-500">Lỗi nạp thư viện người.</div>';
+      }
+    }
+
+    function renderPersons(persons) {
+      const grid = document.getElementById('person-grid');
+      if (!persons.length) {
+        grid.innerHTML = '<div class="col-span-full py-12 text-center text-xs text-zinc-500">Không tìm thấy người nào.</div>';
+        return;
+      }
+      grid.innerHTML = persons.map(p => `
+        <div onclick="openGallery('${p.name}')" class="double-bezel p-2.5 rounded-2xl cursor-pointer hover:border-white/20 transition group">
+          <div class="aspect-square rounded-xl bg-black/40 overflow-hidden relative flex items-center justify-center">
+            ${p.avatar_url ? `
+              <img src="${p.avatar_url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover transition duration-300 group-hover:scale-105">
+            ` : ''}
+            <div class="img-fallback ${p.avatar_url ? 'hidden' : ''} w-full h-full flex flex-col items-center justify-center bg-zinc-900 text-zinc-500">
+              <span class="text-base font-bold text-zinc-400 font-mono">${p.name.slice(0, 2).toUpperCase()}</span>
+            </div>
+          </div>
+          <div class="pt-2 px-1 flex items-center justify-between">
+            <span class="font-semibold text-xs text-zinc-200 truncate group-hover:text-white" title="${p.name}">${p.name}</span>
+            <span class="text-[10px] text-zinc-500 font-mono font-medium">${p.count}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterPersonsList(query) {
+      const q = query.toLowerCase().trim();
+      const filtered = allPersons.filter(p => p.name.toLowerCase().includes(q));
+      renderPersons(filtered);
+    }
+
+    let currentGalleryFiles = [];
+
+    async function openGallery(personName) {
+      currentGalleryPerson = personName;
+      document.getElementById('person-grid').classList.add('hidden');
+      const panel = document.getElementById('gallery-panel');
+      panel.classList.remove('hidden');
+
+      document.getElementById('gallery-person-title').innerText = personName;
+      const imagesGrid = document.getElementById('gallery-images-grid');
+      imagesGrid.innerHTML = '<div class="col-span-full py-12 text-center text-xs text-zinc-500">Đang nạp ảnh...</div>';
+
+      try {
+        const res = await fetch(`/api/persons/${encodeURIComponent(personName)}`);
+        const data = await res.json();
+        currentGalleryFiles = data.files || [];
+        document.getElementById('gallery-person-count').innerText = `${data.total_files} ảnh`;
+
+        if (!data.files.length) {
+          imagesGrid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-zinc-500">Thư mục trống.</div>';
+          return;
+        }
+
+        imagesGrid.innerHTML = data.files.map((f, idx) => `
+          <div class="double-bezel p-1.5 rounded-xl group relative overflow-hidden">
+            <div onclick="openGalleryPreview(${idx})" class="aspect-square rounded-lg bg-black/40 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
+              <img src="${f.url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105">
+              <div class="img-fallback hidden w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-[10px]">Lỗi ảnh</div>
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between p-2">
+                <span class="p-1 rounded bg-black/70 text-white/90 text-[10px] font-mono flex items-center gap-1">
+                  <i data-lucide="zoom-in" class="w-3 h-3 text-cyan-300"></i> Xem
+                </span>
+                <button onclick="event.stopPropagation(); deleteImage('${f.path}')" class="p-1.5 rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white" title="Xóa ảnh">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+            <span class="block pt-1 text-[10px] font-mono text-zinc-400 truncate px-0.5">${f.name}</span>
+          </div>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {
+        imagesGrid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-rose-500">Lỗi khi tải ảnh.</div>';
+      }
+    }
+
+    function openGalleryPreview(idx) {
+      if (!currentGalleryFiles || !currentGalleryFiles.length) return;
+      const list = currentGalleryFiles.map(f => ({
+        src: f.url,
+        title: f.name,
+        subtitle: currentGalleryPerson || 'Thư viện Dataset',
+      }));
+      const cur = list[idx] || list[0];
+      openImagePreview(cur.src, cur.title, cur.subtitle, list, idx);
+    }
+
+    function closeGallery() {
+      document.getElementById('gallery-panel').classList.add('hidden');
+      document.getElementById('person-grid').classList.remove('hidden');
+    }
+
+    async function deleteImage(path) {
+      if (!confirm(`Bạn có chắc muốn xóa tệp này không?`)) return;
+      try {
+        const res = await fetch('/api/media', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Đã xóa ${data.deleted}`, 'success');
+          openGallery(currentGalleryPerson);
+          loadStats();
+        }
+      } catch (err) {
+        showToast('Lỗi khi xóa ảnh', 'error');
+      }
+    }
+
+    async function cleanPersonFiles() {
+      try {
+        const res = await fetch('/api/clean', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ person: currentGalleryPerson, apply: true })
+        });
+        const data = await res.json();
+        showToast(data.message, 'success');
+        openGallery(currentGalleryPerson);
+      } catch (err) {
+        showToast('Lỗi khi chuẩn hóa tên', 'error');
+      }
+    }
+
+    // ==============================================================
+    // RENAMER & SCANNER TAB (REAL-TIME SSE STREAMING & CANCELLATION)
+    // ==============================================================
+    let scanEventSource = null;
+
+    async function cancelScan() {
+      if (scanEventSource) {
+        scanEventSource.close();
+        scanEventSource = null;
+      }
+      try {
+        await fetch('/api/scan/cancel', { method: 'POST' });
+      } catch (e) {}
+
+      document.getElementById('scan-progress-status').innerText = 'Đã dừng quét theo yêu cầu của bạn.';
+      document.getElementById('btn-scan-cancel').classList.add('hidden');
+      const btnScan = document.getElementById('btn-scan');
+      const btnApply = document.getElementById('btn-apply-rename');
+      btnScan.disabled = false;
+      btnApply.disabled = false;
+      btnScan.classList.remove('opacity-50');
+      btnApply.classList.remove('opacity-50');
+      showToast('Đã dừng tiến trình quét', 'info');
+    }
+
+    function buildScanCardHtml(r) {
+      let badgeClass = 'bg-zinc-800 text-zinc-400 border border-white/10';
+      let badgeText = r.person || 'Unknown';
+      let confColor = 'text-zinc-500';
+
+      if (r.status === 'renamed_now') {
+        badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        badgeText = `Đã đổi tên: ${r.person}`;
+        confColor = 'text-emerald-400';
+      } else if (r.status === 'recognized') {
+        badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        badgeText = `${r.person} (${(r.confidence || 0).toFixed(1)}%)`;
+        confColor = 'text-emerald-400';
+      } else if (r.status === 'already_named') {
+        badgeClass = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        badgeText = `Đã gán nhãn: ${r.person}`;
+        confColor = 'text-cyan-400';
+      } else if (r.status === 'low_confidence') {
+        badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        badgeText = `Nghi vấn (${(r.confidence || 0).toFixed(1)}%)`;
+        confColor = 'text-amber-400';
+      } else {
+        badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        badgeText = `Người lạ`;
+        confColor = 'text-rose-400';
+      }
+
+      const currentOnDisk = r.current_name || r.original;
+      const isRenamed = (r.status === 'renamed_now' || (r.new_name && r.new_name !== r.original && r.status !== 'already_named'));
+      const hasProposal = (r.new_name && r.new_name !== currentOnDisk && r.status !== 'already_named' && r.status !== 'renamed_now');
+
+      return `
+        <div class="double-bezel p-3 rounded-2xl flex flex-col space-y-2.5 relative group hover:border-white/20 transition-all bg-[#0B0D13]">
+          <!-- Image Core Container with Double Bezel -->
+          <div onclick="openImagePreview('${r.url}', '${currentOnDisk}', '${badgeText}')" class="aspect-[4/3] rounded-xl bg-black/80 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
+            <img src="${r.url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]">
+            
+            <!-- Fallback in case of image load error -->
+            <div class="img-fallback hidden absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/95 text-zinc-500 text-xs p-3 text-center">
+              <i data-lucide="image-off" class="w-6 h-6 mb-1 text-zinc-600"></i>
+              <span class="font-mono text-[10px] truncate max-w-full text-zinc-400">${currentOnDisk}</span>
+            </div>
+
+            <!-- Surgical HUD Bounding Box -->
+            ${r.bbox ? `
+              <div class="absolute hud-box hud-bracket rounded pointer-events-none" style="left:${r.bbox.x*100}%; top:${r.bbox.y*100}%; width:${r.bbox.w*100}%; height:${r.bbox.h*100}%"></div>
+            ` : ''}
+
+            <!-- Corner Badge Attached to Reticle -->
+            <div class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold tracking-tight shadow-lg backdrop-blur-md ${badgeClass}">
+              ${badgeText}
+            </div>
+          </div>
+
+          <!-- File Name Details & Transformation -->
+          <div class="space-y-1 px-1">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-zinc-100 truncate" title="${currentOnDisk}">${currentOnDisk}</span>
+              <span class="text-[10px] font-mono font-semibold ${confColor}">${r.confidence > 0 ? r.confidence.toFixed(1) + '%' : ''}</span>
+            </div>
+
+            ${r.status === 'renamed_now' && r.original && r.original !== currentOnDisk ? `
+              <div class="text-[11px] font-mono text-zinc-500 truncate flex items-center gap-1.5">
+                <span class="text-zinc-600">Đã đổi từ:</span>
+                <span class="text-zinc-400 truncate line-through" title="${r.original}">${r.original}</span>
+              </div>
+            ` : (hasProposal ? `
+              <div class="text-[11px] font-mono text-emerald-400 truncate flex items-center gap-1">
+                <span class="text-zinc-500">Đề xuất:</span>
+                <span class="truncate font-semibold" title="${r.new_name}">→ ${r.new_name}</span>
+              </div>
+            ` : '')}
+
+            <p class="text-[10px] text-zinc-500 truncate font-mono">${r.reason || ''}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function runScan(apply = false) {
+      const force = document.getElementById('scan-force-check')?.checked || false;
+      const btnScan = document.getElementById('btn-scan');
+      const btnApply = document.getElementById('btn-apply-rename');
+      const btnCancel = document.getElementById('btn-scan-cancel');
+      const progressBox = document.getElementById('scan-progress-box');
+      const progressBar = document.getElementById('scan-progress-bar');
+      const progressStatus = document.getElementById('scan-progress-status');
+      const progressCounter = document.getElementById('scan-progress-counter');
+      const grid = document.getElementById('scan-results-grid');
+
+      if (scanEventSource) {
+        scanEventSource.close();
+        scanEventSource = null;
+      }
+
+      // UI state
+      btnScan.disabled = true;
+      btnApply.disabled = true;
+      btnScan.classList.add('opacity-50');
+      btnApply.classList.add('opacity-50');
+      btnCancel.classList.remove('hidden');
+
+      progressBox.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressCounter.innerText = '0 / --';
+      progressStatus.innerText = apply ? 'Đang khởi chạy luồng phân tích & đổi tên trực tiếp...' : 'Đang khởi chạy luồng quét xem trước trực tiếp...';
+
+      // Stats reset
+      document.getElementById('scan-stats-bar').classList.remove('hidden');
+      document.getElementById('scan-stat-rec').innerText = '0';
+      document.getElementById('scan-stat-low').innerText = '0';
+      document.getElementById('scan-stat-unk').innerText = '0';
+      document.getElementById('scan-stat-skip').innerText = '0';
+
+      grid.innerHTML = '';
+
+      const url = `/api/scan/stream?apply=${apply}&force=${force}`;
+      scanEventSource = new EventSource(url);
+
+      scanEventSource.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'start') {
+          progressCounter.innerText = `0 / ${data.total}`;
+          progressStatus.innerText = `Bắt đầu quét ${data.total} tệp trong chua_phan_loai...`;
+          if (data.total === 0) {
+            grid.innerHTML = '<div class="col-span-full py-16 text-center text-xs text-zinc-500">Thư mục chưa phân loại trống.</div>';
+          }
+        } else if (data.type === 'item') {
+          const pct = Math.round((data.index / data.total) * 100);
+          progressBar.style.width = `${pct}%`;
+          progressCounter.innerText = `${data.index} / ${data.total} (${pct}%)`;
+          progressStatus.innerText = `[${data.index}/${data.total}] Đang xử lý: ${data.item.current_name || data.item.original}`;
+
+          // Update stats
+          if (data.stats) {
+            document.getElementById('scan-stat-rec').innerText = data.stats.recognized || 0;
+            document.getElementById('scan-stat-low').innerText = data.stats.low_confidence || 0;
+            document.getElementById('scan-stat-unk').innerText = data.stats.unknown || 0;
+            document.getElementById('scan-stat-skip').innerText = data.stats.skipped || 0;
+          }
+
+          // Append card
+          const cardHtml = buildScanCardHtml(data.item);
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = cardHtml;
+          const cardEl = tempDiv.firstElementChild;
+          grid.appendChild(cardEl);
+          lucide.createIcons();
+        } else if (data.type === 'complete') {
+          progressBar.style.width = '100%';
+          progressStatus.innerText = apply ? '✅ Hoàn tất! Đã đổi tên các tệp nhận diện thành công.' : '✅ Hoàn tất quét xem trước tất cả tệp.';
+          btnCancel.classList.add('hidden');
+          btnScan.disabled = false;
+          btnApply.disabled = false;
+          btnScan.classList.remove('opacity-50');
+          btnApply.classList.remove('opacity-50');
+          scanEventSource.close();
+          scanEventSource = null;
+          showToast(apply ? 'Đã áp dụng đổi tên thành công!' : 'Đã quét xong ảnh chưa phân loại', 'success');
+          loadStats();
+        } else if (data.type === 'cancelled') {
+          progressStatus.innerText = '⚠️ ' + data.message;
+          btnCancel.classList.add('hidden');
+          btnScan.disabled = false;
+          btnApply.disabled = false;
+          btnScan.classList.remove('opacity-50');
+          btnApply.classList.remove('opacity-50');
+          scanEventSource.close();
+          scanEventSource = null;
+          showToast(data.message, 'info');
+          loadStats();
+        }
+      };
+
+      scanEventSource.onerror = function() {
+        progressStatus.innerText = 'Kết nối luồng dữ liệu hoàn tất.';
+        btnCancel.classList.add('hidden');
+        btnScan.disabled = false;
+        btnApply.disabled = false;
+        btnScan.classList.remove('opacity-50');
+        btnApply.classList.remove('opacity-50');
+        if (scanEventSource) {
+          scanEventSource.close();
+          scanEventSource = null;
+        }
+      };
+    }
+
+    async function runOrganizeFiles() {
+      if (!confirm('Bạn có muốn di chuyển tất cả file đã nhận diện vào đúng thư mục người không?')) return;
+      try {
+        const res = await fetch('/api/organize', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message, 'success');
+        runScan(false);
+        loadStats();
+      } catch (err) {
+        showToast('Lỗi khi di chuyển file', 'error');
+      }
+    }
+
+    // ==============================================================
+    // CLUSTERING TAB
+    // ==============================================================
+    async function runClustering() {
+      const container = document.getElementById('clustering-container');
+      container.innerHTML = '<div class="py-16 text-center text-xs text-zinc-400">Đang chạy thuật toán DBSCAN phân tích khuôn mặt người lạ...</div>';
+
+      try {
+        const res = await fetch('/api/cluster', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+
+        if (!data.clusters || !data.clusters.length) {
+          container.innerHTML = `
+            <div class="surface-card p-12 rounded-2xl text-center space-y-2">
+              <p class="text-sm font-semibold text-zinc-200">Không phát hiện nhóm người lạ nào trùng lặp</p>
+              <p class="text-xs text-zinc-500">Mỗi khuôn mặt chưa nhận diện xuất hiện dưới 2 lần hoặc dữ liệu đã được gom nhóm hết.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = data.clusters.map(c => `
+          <div class="surface-card rounded-2xl p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
+              <div class="flex items-center gap-3">
+                <span class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-mono font-bold text-xs">#${c.cluster_id}</span>
+                <div>
+                  <h4 class="font-bold text-sm text-zinc-100">${c.suggested_name}</h4>
+                  <span class="text-xs text-zinc-500 font-mono">${c.count} ảnh • Tương đồng nội cụm: <span class="text-emerald-400 font-bold">${c.avg_similarity}%</span></span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <input type="text" id="cluster-name-${c.cluster_id}" value="${c.suggested_name}" class="px-3 py-1.5 text-xs font-mono rounded-xl bg-black/40 border border-white/[0.08] text-zinc-200 w-36 focus:outline-none focus:border-amber-400">
+                <button onclick="applyCluster('${c.cluster_id}', ${JSON.stringify(c.files.map(f => f.path)).replace(/"/g, '&quot;')})" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition">
+                  <i data-lucide="folder-plus" class="w-3.5 h-3.5"></i>
+                  <span>Tạo Folder & Move</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              ${c.files.map(f => `
+                <div class="double-bezel p-1.5 rounded-xl">
+                  <div class="aspect-square rounded-lg bg-black/40 overflow-hidden relative">
+                    <img src="${f.url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover">
+                    <div class="img-fallback hidden w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-[10px]">Lỗi ảnh</div>
+                  </div>
+                  <span class="block pt-1 text-[10px] font-mono text-zinc-400 truncate px-0.5">${f.name}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {
+        container.innerHTML = '<div class="py-12 text-center text-xs text-rose-500">Lỗi khi gom nhóm khuôn mặt.</div>';
+      }
+    }
+
+    async function applyCluster(clusterId, files) {
+      const input = document.getElementById(`cluster-name-${clusterId}`);
+      const name = input ? input.value.trim() : `cluster_${clusterId}`;
+      if (!name) return;
+
+      try {
+        const res = await fetch('/api/cluster/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, files, move_to_dataset: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Đã tạo folder dataset/${name} và di chuyển ${data.moved_count} ảnh!`, 'success');
+          runClustering();
+          loadStats();
+        }
+      } catch (err) {
+        showToast('Lỗi khi áp dụng gom nhóm', 'error');
+      }
+    }
+
+    // ==============================================================
+    // DOWNLOADER TAB (WEB & INSTAGRAM)
+    // ==============================================================
+    let userEditedPersonName = false;
+
+    function getCleanPersonSlug() {
+      const explicitPerson = document.getElementById('dl-person-name')?.value.trim();
+      if (explicitPerson) {
+        return explicitPerson.toLowerCase().replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'person';
+      }
+      const query = document.getElementById('dl-query')?.value.trim() || '';
+      let slug = query;
+      if (slug.includes('facebook.com/') || slug.includes('fb.com/')) {
+        slug = slug.split(/facebook\.com\/|fb\.com\//).pop().split('/photos')[0].split('/posts')[0].split('?')[0].trim();
+      } else if (slug.includes('instagram.com/')) {
+        slug = slug.split('instagram.com/').pop().split('/')[0].split('?')[0].trim();
+      } else {
+        slug = slug.replace(/^@/, '').trim();
+      }
+      return slug.toLowerCase().replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'face';
+    }
+
+    function updateDestPreview() {
+      const mode = document.getElementById('dl-dest-mode')?.value || 'download_person';
+      const customInput = document.getElementById('dl-custom-path')?.value.trim() || '';
+      const label = document.getElementById('dl-dest-preview-label');
+      const prefixLabel = document.getElementById('dl-prefix-preview');
+      if (!label) return;
+
+      const slug = getCleanPersonSlug();
+
+      if (mode === 'download_person') {
+        label.innerText = `download/${slug}/`;
+      } else if (mode === 'dataset_person') {
+        label.innerText = `dataset/${slug}/`;
+      } else if (mode === 'chua_phan_loai') {
+        label.innerText = `dataset/chua_phan_loai/`;
+      } else if (mode === 'custom') {
+        label.innerText = customInput || 'Thư mục tùy chọn';
+      }
+      if (prefixLabel) {
+        prefixLabel.innerText = `${slug}_0001.jpg`;
+      }
+    }
+
+    function handlePersonNameInput(val) {
+      userEditedPersonName = val.trim().length > 0;
+      updateDestPreview();
+    }
+
+    function toggleDownloadAll(checked) {
+      const countInput = document.getElementById('dl-count');
+      const allBadge = document.getElementById('dl-count-all-badge');
+      if (checked) {
+        allBadge.classList.remove('hidden');
+        allBadge.classList.add('flex');
+        countInput.disabled = true;
+      } else {
+        allBadge.classList.add('hidden');
+        allBadge.classList.remove('flex');
+        countInput.disabled = false;
+      }
+    }
+
+    function setDownloadMode(mode) {
+      currentDownloadMode = mode;
+      const btnWeb = document.getElementById('mode-btn-web');
+      const btnIg = document.getElementById('mode-btn-ig');
+      const btnFb = document.getElementById('mode-btn-fb');
+      const label = document.getElementById('dl-query-label');
+      const input = document.getElementById('dl-query');
+      const allLabel = document.getElementById('dl-all-label');
+      const allCheck = document.getElementById('dl-all-check');
+
+      const activeClass = 'px-3 py-1.5 rounded-lg font-medium transition text-zinc-100 bg-white/[0.1] shadow-sm flex items-center gap-1.5';
+      const inactiveClass = 'px-3 py-1.5 rounded-lg font-medium transition text-zinc-400 hover:text-white flex items-center gap-1.5';
+
+      if (btnWeb) btnWeb.className = (mode === 'web') ? activeClass : inactiveClass;
+      if (btnIg) btnIg.className = (mode === 'instagram') ? activeClass : inactiveClass;
+      if (btnFb) btnFb.className = (mode === 'facebook') ? activeClass : inactiveClass;
+
+      if (mode === 'facebook') {
+        label.innerText = 'Link Profile, Album /photos hoặc Video / Highlight Facebook';
+        input.placeholder = 'Ví dụ: https://www.facebook.com/caca.tieu.50309/photos hoặc caca.tieu.50309...';
+        if (allLabel) {
+          allLabel.classList.remove('hidden');
+          allLabel.classList.add('flex');
+        }
+      } else if (mode === 'instagram') {
+        label.innerText = 'Tài khoản Instagram, Link Profile, Story hoặc Reel';
+        input.placeholder = 'Ví dụ: lhtm080104, @lhtm080104 hoặc https://www.instagram.com/lhtm080104/...';
+        if (allLabel) {
+          allLabel.classList.remove('hidden');
+          allLabel.classList.add('flex');
+        }
+      } else {
+        label.innerText = 'Từ khóa tìm kiếm hoặc Link Video';
+        input.placeholder = 'Ví dụ: Taylor Swift, Mr Beast, Sơn Tùng M-TP...';
+        if (allLabel) {
+          allLabel.classList.add('hidden');
+          allLabel.classList.remove('flex');
+        }
+        if (allCheck && allCheck.checked) {
+          allCheck.checked = false;
+          toggleDownloadAll(false);
+        }
+      }
+      if (window.lucide) lucide.createIcons();
+      updateDestPreview();
+    }
+
+    function handleQueryInput(val) {
+      const trimmed = val.trim();
+      const igBadge = document.getElementById('dl-ig-badge');
+      const fbBadge = document.getElementById('dl-fb-badge');
+      const vidBadge = document.getElementById('dl-vid-badge');
+      const personInput = document.getElementById('dl-person-name');
+
+      const isVid = /reel\/|stories\/|videos\/|watch|\.mp4|\.mov|\.webm/i.test(trimmed);
+      if (vidBadge) {
+        if (isVid) vidBadge.classList.remove('hidden');
+        else vidBadge.classList.add('hidden');
+      }
+
+      if (trimmed.includes('facebook.com') || trimmed.includes('fb.com')) {
+        if (fbBadge) fbBadge.classList.remove('hidden');
+        if (igBadge) igBadge.classList.add('hidden');
+        if (currentDownloadMode !== 'facebook' && !isVid) {
+          setDownloadMode('facebook');
+        }
+      } else if (trimmed.startsWith('@') || trimmed.includes('instagram.com') || trimmed.includes('instagr.am')) {
+        if (igBadge) igBadge.classList.remove('hidden');
+        if (fbBadge) fbBadge.classList.add('hidden');
+        if (currentDownloadMode !== 'instagram' && !isVid) {
+          setDownloadMode('instagram');
+        }
+      } else {
+        if (igBadge) igBadge.classList.add('hidden');
+        if (fbBadge) fbBadge.classList.add('hidden');
+      }
+
+      // Tự động gợi ý tên người vào ô dl-person-name nếu người dùng chưa tự gõ tay
+      if (!userEditedPersonName && personInput) {
+        let suggested = trimmed;
+        if (suggested.includes('facebook.com/') || suggested.includes('fb.com/')) {
+          suggested = suggested.split(/facebook\.com\/|fb\.com\//).pop().split('/photos')[0].split('/posts')[0].split('?')[0].trim();
+        } else if (suggested.includes('instagram.com/')) {
+          suggested = suggested.split('instagram.com/').pop().split('/')[0].split('?')[0].trim();
+        } else {
+          suggested = suggested.replace(/^@/, '').trim();
+        }
+        suggested = suggested.toLowerCase().replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+        personInput.value = suggested;
+      }
+
+      updateDestPreview();
+    }
+
+    function handleDestModeChange(val) {
+      const customWrap = document.getElementById('dl-custom-path-wrap');
+      if (val === 'custom') {
+        customWrap.classList.remove('hidden');
+      } else {
+        customWrap.classList.add('hidden');
+      }
+      updateDestPreview();
+    }
+
+    let downloadEventSource = null;
+
+    async function cancelDownload() {
+      if (downloadEventSource) {
+        downloadEventSource.close();
+        downloadEventSource = null;
+      }
+      try {
+        await fetch('/api/download/cancel', { method: 'POST' });
+      } catch (e) {}
+
+      document.getElementById('dl-stream-status').innerText = 'Đã dừng thu thập ảnh theo yêu cầu của bạn.';
+      document.getElementById('dl-stream-bar').classList.remove('animate-pulse');
+      document.getElementById('dl-stream-counter').innerText = 'Đã dừng';
+      document.getElementById('btn-stop-dl')?.classList.add('hidden');
+      const btn = document.getElementById('btn-start-dl');
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i> <span>Bắt đầu Thu Thập</span>`;
+      lucide.createIcons();
+      showToast('Đã dừng thu thập ảnh', 'info');
+    }
+
+    function startDownloadStream() {
+      const query = document.getElementById('dl-query').value.trim();
+      const personName = document.getElementById('dl-person-name')?.value.trim() || '';
+      const includeVideos = document.getElementById('dl-include-videos')?.checked || false;
+      const extractFrames = document.getElementById('dl-extract-frames')?.checked || false;
+      const skipStaticVideo = document.getElementById('dl-skip-static-video')?.checked ?? true;
+
+      if (!query && !personName) {
+        showToast('Vui lòng nhập từ khóa tìm kiếm hoặc tên người', 'error');
+        return;
+      }
+
+      const destMode = document.getElementById('dl-dest-mode').value;
+      const customDir = document.getElementById('dl-custom-path').value.trim();
+      const downloadAll = (currentDownloadMode === 'instagram' || currentDownloadMode === 'facebook') && (document.getElementById('dl-all-check')?.checked || false);
+      const count = downloadAll ? 0 : (parseInt(document.getElementById('dl-count').value, 10) || 10);
+      const samePerson = document.getElementById('dl-same-person').checked;
+      const cleanTarget = document.getElementById('dl-clean-target')?.checked || false;
+
+      const panel = document.getElementById('dl-stream-panel');
+      panel.classList.remove('hidden');
+
+      const grid = document.getElementById('dl-stream-grid');
+      grid.innerHTML = '';
+      const candidatesGrid = document.getElementById('dl-candidates-grid');
+      candidatesGrid.innerHTML = '';
+
+      document.getElementById('dl-candidates-count').innerText = '0';
+      document.getElementById('dl-saved-count').innerText = '0';
+
+      const btn = document.getElementById('btn-start-dl');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin mr-1">⌛</span> Đang thu thập...`;
+
+      // Hiển thị nút Dừng Tải
+      document.getElementById('btn-stop-dl')?.classList.remove('hidden');
+
+      if (downloadAll) {
+        document.getElementById('dl-stream-bar').style.width = '100%';
+        document.getElementById('dl-stream-bar').className = 'bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 h-full w-full animate-pulse transition-all duration-300';
+        document.getElementById('dl-stream-counter').innerText = '0 / ∞ (Toàn bộ)';
+        document.getElementById('dl-stream-status').innerText = 'Đang kết nối luồng thu thập toàn bộ ảnh...';
+      } else {
+        document.getElementById('dl-stream-bar').style.width = '0%';
+        document.getElementById('dl-stream-bar').className = 'bg-gradient-to-r from-cyan-500 to-emerald-400 h-full w-0 transition-all duration-300';
+        document.getElementById('dl-stream-counter').innerText = `0 / ${count}`;
+        document.getElementById('dl-stream-status').innerText = 'Đang kết nối luồng thu thập ảnh...';
+      }
+
+      let url = `/api/download/stream?query=${encodeURIComponent(query)}&person=${encodeURIComponent(personName)}&include_videos=${includeVideos}&extract_frames=${extractFrames}&skip_static_video=${skipStaticVideo}&mode=${currentDownloadMode}&dest_mode=${encodeURIComponent(destMode)}&count=${count}&download_all=${downloadAll}&same_person=${samePerson}&clean_target=${cleanTarget}`;
+      if (destMode === 'custom' && customDir) {
+        url += `&custom_dir=${encodeURIComponent(customDir)}`;
+      }
+
+      if (downloadEventSource) {
+        downloadEventSource.close();
+      }
+
+      let candidateCount = 0;
+      downloadEventSource = new EventSource(url);
+
+      downloadEventSource.onmessage = function(e) {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'start') {
+          const modeStr = msg.mode.toUpperCase();
+          const targetStr = msg.unlimited ? 'Toàn bộ (∞)' : `${msg.count} ảnh`;
+          document.getElementById('dl-stream-status').innerText = `Đang tìm kiếm cho: "${msg.query}" (${modeStr} - Mục tiêu: ${targetStr})`;
+          document.getElementById('dl-stream-dest-label').innerText = msg.target;
+        } else if (msg.type === 'info') {
+          document.getElementById('dl-stream-status').innerText = msg.message;
+        } else if (msg.type === 'anchor_established') {
+          document.getElementById('dl-stream-status').innerText = msg.message;
+          showToast(msg.message, 'success');
+        } else if (msg.type === 'searching') {
+          document.getElementById('dl-stream-status').innerText = msg.message;
+        } else if (msg.type === 'candidate_found') {
+          candidateCount++;
+          document.getElementById('dl-candidates-count').innerText = candidateCount;
+          const proxyUrl = msg.url.startsWith('data:') ? msg.url : `/api/proxy_image?url=${encodeURIComponent(msg.url)}`;
+          const card = document.createElement('div');
+          card.id = `cand-card-${msg.id}`;
+          card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-[#0A0C11] border border-white/[0.07] transition-all animate-fade-in';
+          const avatarBadge = msg.is_avatar ? `<span class="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500 text-black shadow">👑 Avatar</span>` : '';
+          const sourceTag = msg.source === 'video' ? 'VID' : (msg.source === 'facebook' ? 'FB' : (msg.source === 'instagram' ? 'IG' : 'Web'));
+          card.innerHTML = `
+            <div onclick="openImagePreview('${msg.url}', 'Ứng viên #${msg.id}', '${msg.desc || ''}')" class="aspect-square rounded-lg bg-black/60 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
+              <img id="cand-img-${msg.id}" src="${proxyUrl}" onerror="this.onerror=null; this.src='${msg.url}'; this.referrerPolicy='no-referrer';" loading="lazy" class="w-full h-full object-cover">
+              ${avatarBadge}
+              <div id="cand-status-${msg.id}" class="absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-cyan-500/30 text-cyan-200 border border-cyan-500/40">
+                ⏳ Đang kiểm tra...
+              </div>
+            </div>
+            <span class="block text-[8px] font-mono text-zinc-400 truncate px-0.5" title="${msg.desc || msg.url}">#${msg.id} ${sourceTag}</span>
+          `;
+          candidatesGrid.appendChild(card);
+          candidatesGrid.scrollTop = candidatesGrid.scrollHeight;
+        } else if (msg.type === 'candidate_evaluating') {
+          const badge = document.getElementById(`cand-status-${msg.id}`);
+          if (badge) {
+            badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-amber-500/30 text-amber-200 border border-amber-500/40 animate-pulse';
+            badge.innerText = '🔍 Đang so khớp...';
+          }
+        } else if (msg.type === 'candidate_status') {
+          const card = document.getElementById(`cand-card-${msg.id}`);
+          const badge = document.getElementById(`cand-status-${msg.id}`);
+          if (badge) {
+            if (msg.status === 'accepted') {
+              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-emerald-950/20 border border-emerald-500/40 shadow-sm transition-all';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-bold text-center truncate backdrop-blur-md bg-emerald-500/70 text-emerald-100 border border-emerald-500/80';
+              badge.innerText = `✅ Khớp (${msg.sim}%)`;
+              if (msg.local_url) {
+                const imgEl = document.getElementById(`cand-img-${msg.id}`);
+                if (imgEl) imgEl.src = msg.local_url;
+              }
+            } else if (msg.status === 'rejected') {
+              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-rose-950/10 border border-rose-500/20 opacity-70 transition-all';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-rose-500/30 text-rose-200 border border-rose-500/40';
+              badge.innerText = `⏭️ Khác (${msg.sim}%)`;
+            } else if (msg.status === 'no_face') {
+              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-black/40 border border-white/[0.04] opacity-50 transition-all';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10';
+              badge.innerText = '⚪ Không có mặt';
+            } else if (msg.status === 'error') {
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10';
+              badge.innerText = '⚠️ Lỗi tải';
+            }
+          }
+        } else if (msg.type === 'skipped') {
+          document.getElementById('dl-stream-status').innerText = msg.message;
+        } else if (msg.type === 'saved') {
+          document.getElementById('dl-saved-count').innerText = msg.saved;
+          if (msg.unlimited) {
+            document.getElementById('dl-stream-counter').innerText = `${msg.saved} / ∞ (Đang duyệt...)`;
+            document.getElementById('dl-stream-status').innerText = `Đã lưu: ${msg.filename} (sim: ${msg.sim}%) - Đang quét tiếp...`;
+          } else {
+            const pct = Math.round((msg.saved / msg.total) * 100);
+            document.getElementById('dl-stream-bar').style.width = `${pct}%`;
+            document.getElementById('dl-stream-counter').innerText = `${msg.saved} / ${msg.total}`;
+            document.getElementById('dl-stream-status').innerText = `Đã tải: ${msg.filename} (sim: ${msg.sim}%)`;
+          }
+
+          const isVid = msg.is_video || (msg.filename && msg.filename.toLowerCase().endsWith('.mp4'));
+          const card = document.createElement('div');
+          card.className = 'double-bezel p-2 rounded-xl animate-fade-in flex flex-col space-y-1 bg-[#0A0C11] border border-white/[0.08]';
+          const innerMedia = isVid
+            ? `<div onclick="openImagePreview('${msg.url}', '${msg.filename}', 'Video đã xác thực (sim: ${msg.sim}%)')" class="aspect-square rounded-lg bg-black/80 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-purple-500/50 transition">
+                <video src="${msg.url}" preload="metadata" class="w-full h-full object-cover"></video>
+                <div class="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/10 transition">
+                  <div class="w-8 h-8 rounded-full bg-purple-500/90 text-white flex items-center justify-center shadow-lg">
+                    <i data-lucide="play" class="w-4 h-4 fill-white ml-0.5"></i>
+                  </div>
+                </div>
+                <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-purple-500/90 text-white shadow">🎬 Video</span>
+                <span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/90 text-white shadow">${msg.sim}%</span>
+              </div>`
+            : `<div onclick="openImagePreview('${msg.url}', '${msg.filename}', 'Độ tin cậy: ${msg.sim}%')" class="aspect-square rounded-lg bg-black/60 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-emerald-500/40 transition">
+                <img src="${msg.url}" onerror="handleImgError(this)" class="w-full h-full object-cover">
+                <div class="img-fallback hidden w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-[10px]">Tải xong</div>
+                <span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/90 text-white shadow">${msg.sim}%</span>
+              </div>`;
+          card.innerHTML = `
+            ${innerMedia}
+            <span class="block pt-1 text-[10px] font-mono text-zinc-300 truncate px-0.5 font-semibold">${msg.filename}</span>
+          `;
+          grid.appendChild(card);
+          if (window.lucide) lucide.createIcons();
+        } else if (msg.type === 'complete') {
+          const finishText = msg.message || `✅ Hoàn tất! Đã lưu ${msg.saved} ảnh vào ${msg.target}`;
+          document.getElementById('dl-stream-status').innerText = finishText;
+          document.getElementById('dl-stream-bar').style.width = '100%';
+          document.getElementById('dl-stream-bar').classList.remove('animate-pulse');
+          document.getElementById('dl-stream-counter').innerText = `${msg.saved} / ${msg.saved} (Hoàn tất)`;
+          document.getElementById('btn-stop-dl')?.classList.add('hidden');
+          showToast(finishText, 'success');
+          downloadEventSource.close();
+          downloadEventSource = null;
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i> <span>Bắt đầu Thu Thập</span>`;
+          lucide.createIcons();
+          loadStats();
+        } else if (msg.type === 'cancelled') {
+          document.getElementById('dl-stream-status').innerText = '⚠️ ' + msg.message;
+          document.getElementById('dl-stream-bar').classList.remove('animate-pulse');
+          document.getElementById('dl-stream-counter').innerText = `${msg.saved || 0} (Đã dừng)`;
+          document.getElementById('btn-stop-dl')?.classList.add('hidden');
+          downloadEventSource.close();
+          downloadEventSource = null;
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i> <span>Bắt đầu Thu Thập</span>`;
+          lucide.createIcons();
+          showToast(msg.message, 'info');
+          loadStats();
+        } else if (msg.type === 'no_results') {
+          document.getElementById('dl-stream-status').innerText = msg.message;
+          document.getElementById('dl-stream-bar').classList.remove('animate-pulse');
+          document.getElementById('dl-stream-counter').innerText = '0 (Không có kết quả)';
+          document.getElementById('btn-stop-dl')?.classList.add('hidden');
+          downloadEventSource.close();
+          downloadEventSource = null;
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i> <span>Bắt đầu Thu Thập</span>`;
+          lucide.createIcons();
+          showToast(msg.message, 'warning');
+          loadStats();
+        }
+      };
+
+      downloadEventSource.onerror = function() {
+        document.getElementById('dl-stream-status').innerText = 'Kết nối hoàn tất.';
+        document.getElementById('dl-stream-bar').classList.remove('animate-pulse');
+        document.getElementById('btn-stop-dl')?.classList.add('hidden');
+        if (downloadEventSource) {
+          downloadEventSource.close();
+          downloadEventSource = null;
+        }
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4 text-zinc-900"></i> <span>Bắt đầu Thu Thập</span>`;
+        lucide.createIcons();
+      };
+    }
+
+    // ==============================================================
+    // PLAYGROUND TAB
+    // ==============================================================
+    async function handlePlaygroundUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const dropzone = document.getElementById('playground-dropzone');
+      const previewBox = document.getElementById('playground-preview-box');
+      const previewImg = document.getElementById('playground-preview-img');
+      const resultsDiv = document.getElementById('playground-results');
+
+      previewImg.src = URL.createObjectURL(file);
+      dropzone.classList.add('hidden');
+      previewBox.classList.remove('hidden');
+
+      resultsDiv.innerHTML = '<div class="py-12 text-center text-xs text-zinc-400">Đang phân tích sinh trắc học khuôn mặt...</div>';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/playground', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        // Draw bounding boxes on canvas
+        const canvas = document.getElementById('playground-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = previewImg.naturalWidth || 600;
+        canvas.height = previewImg.naturalHeight || 600;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!data.results.length) {
+          resultsDiv.innerHTML = '<div class="py-8 text-center text-xs text-amber-400">Không tìm thấy khuôn mặt rõ nét trong ảnh.</div>';
+          return;
+        }
+
+        resultsDiv.innerHTML = data.results.map((r, i) => {
+          // Draw rect on canvas
+          if (r.bbox) {
+            const bx = r.bbox.x * canvas.width;
+            const by = r.bbox.y * canvas.height;
+            const bw = r.bbox.w * canvas.width;
+            const bh = r.bbox.h * canvas.height;
+            ctx.strokeStyle = '#10B981';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(bx, by, bw, bh);
+          }
+
+          return `
+            <div class="surface-card-elevated p-4 rounded-xl space-y-3">
+              <div class="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <span class="font-bold text-xs text-zinc-100">Khuôn mặt #${i+1}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${r.best_match !== 'unknown' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400'}">
+                  ${r.best_match} (${r.confidence}%)
+                </span>
+              </div>
+              <p class="text-[11px] text-zinc-400 font-mono">${r.reason}</p>
+
+              <div class="space-y-1.5 pt-1">
+                <span class="text-[10px] uppercase font-semibold text-zinc-500 tracking-wider">Top 3 người giống nhất:</span>
+                <div class="grid grid-cols-3 gap-2">
+                  ${r.top_candidates.map(c => `
+                    <div class="p-2 rounded-lg bg-black/40 border border-white/[0.05] text-center space-y-1">
+                      <div class="w-10 h-10 rounded-full mx-auto bg-zinc-800 overflow-hidden flex items-center justify-center">
+                        ${c.avatar_url ? `<img src="${c.avatar_url}" onerror="handleImgError(this)" class="w-full h-full object-cover">` : ''}
+                        <div class="img-fallback ${c.avatar_url ? 'hidden' : ''} font-bold text-xs text-zinc-400 font-mono">${c.person.slice(0, 2).toUpperCase()}</div>
+                      </div>
+                      <div class="font-bold text-[11px] text-zinc-200 truncate">${c.person}</div>
+                      <div class="text-[10px] font-mono text-emerald-400">${c.similarity}%</div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        resultsDiv.innerHTML = '<div class="py-8 text-center text-xs text-rose-500">Lỗi phân tích ảnh.</div>';
+      }
+    }
+
+    // ==============================================================
+    // SETTINGS TAB
+    // ==============================================================
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        document.getElementById('setting-cosine').value = cfg.cosine_threshold;
+        document.getElementById('label-cosine').innerText = cfg.cosine_threshold;
+
+        document.getElementById('setting-det').value = cfg.det_thresh;
+        document.getElementById('label-det').innerText = cfg.det_thresh;
+
+        document.getElementById('setting-strategy').value = cfg.multi_face_strategy || 'largest';
+      } catch (err) {
+        showToast('Lỗi tải cấu hình', 'error');
+      }
+    }
+
+    function updateSettingLabel(key, val) {
+      document.getElementById(`label-${key}`).innerText = val;
+    }
+
+    async function saveSettings() {
+      const payload = {
+        cosine_threshold: parseFloat(document.getElementById('setting-cosine').value),
+        det_thresh: parseFloat(document.getElementById('setting-det').value),
+        multi_face_strategy: document.getElementById('setting-strategy').value,
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Đã lưu cấu hình vào config.yaml thành công!', 'success');
+          loadStats();
+        }
+      } catch (err) {
+        showToast('Lỗi khi lưu cấu hình', 'error');
+      }
+    }
+
+    async function clearEmbeddingCache() {
+      if (!confirm('Bạn có chắc muốn xóa toàn bộ cache vector khuôn mặt không?')) return;
+      try {
+        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message, 'success');
+        loadStats();
+      } catch (err) {
+        showToast('Lỗi khi xóa cache', 'error');
+      }
+    }
+
+    async function runPrepareTestData() {
+      const count = prompt('Nhập số lượng ảnh mẫu cần lấy từ mỗi người sang chua_phan_loai:', '5');
+      if (!count) return;
+      try {
+        const res = await fetch('/api/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: parseInt(count) || 5 })
+        });
+        const data = await res.json();
+        showToast(data.message, 'success');
+        loadStats();
+        if (!document.getElementById('view-renamer').classList.contains('hidden')) {
+          runScan(false);
+        }
+      } catch (err) {
+        showToast('Lỗi khi tạo dữ liệu test', 'error');
+      }
+    }
+
+    // ==============================================================
+    // UPLOAD MODAL
+    // ==============================================================
+    let currentUploadTarget = 'chua_phan_loai';
+    function openUploadModal(target) {
+      currentUploadTarget = target;
+      document.getElementById('upload-target-input').value = target;
+      document.getElementById('upload-file-input').value = '';
+      document.getElementById('upload-modal').classList.remove('hidden');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.add('hidden');
+    }
+
+    async function submitUpload() {
+      const fileInput = document.getElementById('upload-file-input');
+      if (!fileInput.files.length) {
+        showToast('Vui lòng chọn ít nhất 1 tệp ảnh', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-upload');
+      btn.disabled = true;
+      btn.innerText = 'Đang tải lên...';
+
+      const formData = new FormData();
+      formData.append('target_dir', currentUploadTarget);
+      for (const f of fileInput.files) {
+        formData.append('files', f);
+      }
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        showToast(`Đã tải lên ${data.uploaded} ảnh thành công!`, 'success');
+        closeUploadModal();
+        loadStats();
+        if (currentUploadTarget === currentGalleryPerson) {
+          openGallery(currentGalleryPerson);
+        }
+      } catch (err) {
+        showToast('Lỗi tải tệp lên', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Tải lên';
+      }
+    }
+
+    // ==============================================================
+    // IMAGE PREVIEW LIGHTBOX MODAL CONTROLLER
+    // ==============================================================
+    let currentPreviewList = [];
+    let currentPreviewIdx = 0;
+    let previewScale = 1.0;
+
+    function openImagePreview(src, title = '', subtitle = '', list = [], idx = 0) {
+      if (!src) return;
+      const modal = document.getElementById('image-preview-modal');
+      const img = document.getElementById('preview-modal-img');
+      const vid = document.getElementById('preview-modal-video');
+      const titleEl = document.getElementById('preview-modal-title');
+      const subEl = document.getElementById('preview-modal-subtitle');
+      const extLink = document.getElementById('preview-modal-ext-link');
+      const prevBtn = document.getElementById('preview-prev-btn');
+      const nextBtn = document.getElementById('preview-next-btn');
+
+      if (!modal) return;
+
+      currentPreviewList = (Array.isArray(list) && list.length > 0) ? list : [{ src, title, subtitle }];
+      currentPreviewIdx = (idx >= 0 && idx < currentPreviewList.length) ? idx : 0;
+      previewScale = 1.0;
+
+      const item = currentPreviewList[currentPreviewIdx] || { src, title, subtitle };
+      const rawSrc = item.src || src;
+      const isVideo = rawSrc.toLowerCase().includes('.mp4');
+
+      if (isVideo) {
+        if (img) img.classList.add('hidden');
+        if (vid) {
+          vid.classList.remove('hidden');
+          vid.src = rawSrc;
+          vid.play().catch(() => {});
+        }
+      } else {
+        if (vid) {
+          vid.pause();
+          vid.classList.add('hidden');
+          vid.src = '';
+        }
+        if (img) {
+          img.classList.remove('hidden');
+          img.src = rawSrc;
+          img.style.transform = `scale(${previewScale})`;
+        }
+      }
+
+      if (titleEl) titleEl.innerText = item.title || title || (isVideo ? 'Xem Video' : 'Xem ảnh phóng to');
+      if (subEl) subEl.innerText = item.subtitle || subtitle || '';
+      if (extLink) extLink.href = rawSrc;
+
+      if (currentPreviewList.length > 1) {
+        if (prevBtn) prevBtn.classList.remove('hidden');
+        if (nextBtn) nextBtn.classList.remove('hidden');
+      } else {
+        if (prevBtn) prevBtn.classList.add('hidden');
+        if (nextBtn) nextBtn.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeImagePreview() {
+      const vid = document.getElementById('preview-modal-video');
+      if (vid) {
+        vid.pause();
+        vid.src = '';
+      }
+      const modal = document.getElementById('image-preview-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function handlePreviewBackdropClick(e) {
+      if (e.target.id === 'image-preview-modal' || e.target.id === 'preview-img-container') {
+        closeImagePreview();
+      }
+    }
+
+    function zoomPreview(delta) {
+      previewScale = Math.min(3.0, Math.max(0.4, previewScale + delta));
+      const img = document.getElementById('preview-modal-img');
+      if (img) img.style.transform = `scale(${previewScale})`;
+    }
+
+    function resetPreviewZoom() {
+      previewScale = 1.0;
+      const img = document.getElementById('preview-modal-img');
+      if (img) img.style.transform = `scale(1)`;
+    }
+
+    function nextImagePreview(e) {
+      if (e) e.stopPropagation();
+      if (!currentPreviewList.length) return;
+      currentPreviewIdx = (currentPreviewIdx + 1) % currentPreviewList.length;
+      const item = currentPreviewList[currentPreviewIdx];
+      openImagePreview(item.src, item.title, item.subtitle, currentPreviewList, currentPreviewIdx);
+    }
+
+    function prevImagePreview(e) {
+      if (e) e.stopPropagation();
+      if (!currentPreviewList.length) return;
+      currentPreviewIdx = (currentPreviewIdx - 1 + currentPreviewList.length) % currentPreviewList.length;
+      const item = currentPreviewList[currentPreviewIdx];
+      openImagePreview(item.src, item.title, item.subtitle, currentPreviewList, currentPreviewIdx);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('image-preview-modal');
+      if (!modal || modal.classList.contains('hidden')) return;
+      if (e.key === 'Escape') closeImagePreview();
+      else if (e.key === 'ArrowRight') nextImagePreview();
+      else if (e.key === 'ArrowLeft') prevImagePreview();
+      else if (e.key === '+' || e.key === '=') zoomPreview(0.2);
+      else if (e.key === '-') zoomPreview(-0.2);
+    });
+
+    // Init on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadStats();
+    });
+  </script>
+
+  <!-- Lightbox Image Preview Modal -->
+  <div id="image-preview-modal" class="hidden fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-5 transition-all duration-200" onclick="handlePreviewBackdropClick(event)">
+    <!-- Top Bar -->
+    <div class="w-full max-w-5xl flex items-center justify-between px-4 py-2.5 mb-2 bg-[#0A0C11]/95 border border-white/[0.08] rounded-2xl shadow-2xl backdrop-blur-xl">
+      <div class="flex items-center gap-3 truncate">
+        <i data-lucide="image" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+        <div class="truncate">
+          <span id="preview-modal-title" class="text-xs font-bold text-zinc-100 block truncate">Xem ảnh phóng to</span>
+          <span id="preview-modal-subtitle" class="text-[10px] text-zinc-400 block truncate font-mono">Chi tiết ảnh</span>
+        </div>
+      </div>
+      
+      <!-- Controls -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button type="button" onclick="zoomPreview(0.2)" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition" title="Phóng to (+)">
+          <i data-lucide="zoom-in" class="w-4 h-4"></i>
+        </button>
+        <button type="button" onclick="zoomPreview(-0.2)" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition" title="Thu nhỏ (-)">
+          <i data-lucide="zoom-out" class="w-4 h-4"></i>
+        </button>
+        <button type="button" onclick="resetPreviewZoom()" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition" title="Đặt lại kích thước gốc">
+          <i data-lucide="maximize-2" class="w-4 h-4"></i>
+        </button>
+        <a id="preview-modal-ext-link" href="#" target="_blank" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition" title="Mở ảnh gốc trong tab mới">
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+        </a>
+        <button type="button" onclick="closeImagePreview()" class="p-2 rounded-xl text-rose-400 hover:text-rose-200 hover:bg-rose-500/20 transition ml-1" title="Đóng (Esc)">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Image Display with Navigation -->
+    <div class="relative w-full max-w-5xl flex-1 flex items-center justify-center overflow-hidden rounded-2xl bg-black/60 border border-white/[0.06] p-2">
+      <!-- Previous Button -->
+      <button id="preview-prev-btn" onclick="prevImagePreview(event)" class="absolute left-3 z-10 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh trước (←)">
+        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Image & Video element -->
+      <div id="preview-img-container" class="w-full h-full flex items-center justify-center overflow-auto">
+        <img id="preview-modal-img" src="" alt="Preview" class="max-w-full max-h-[78vh] object-contain rounded-xl shadow-2xl transition-transform duration-150 select-none pointer-events-auto">
+        <video id="preview-modal-video" src="" controls class="hidden max-w-full max-h-[78vh] rounded-xl shadow-2xl bg-black"></video>
+      </div>
+
+      <!-- Next Button -->
+      <button id="preview-next-btn" onclick="nextImagePreview(event)" class="absolute right-3 z-10 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh tiếp (→)">
+        <i data-lucide="chevron-right" class="w-6 h-6"></i>
+      </button>
+    </div>
+  </div>
+  </script>
+</body>
+</html>
