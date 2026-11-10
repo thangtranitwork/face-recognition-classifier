@@ -118,28 +118,46 @@ def safe_move(src_path: Path, target_dir: Path, target_filename: Optional[str] =
     return dest_path
 
 
-def build_new_name(person: str, original_name: str, name_format: str) -> str:
+def build_new_name(
+    person: str,
+    original_name: str,
+    name_format: str,
+    is_sensitive: bool = False,
+    sensitive_prefix: str = "sensitive"
+) -> str:
     """Tạo tên tệp mới theo định dạng khuôn mẫu, tránh trùng lặp tiền tố đã tồn tại."""
     stem = Path(original_name).stem
     suffix = Path(original_name).suffix.lower()
 
-    # Làm sạch stem nếu file đã từng có tiền tố của người này hoặc tiền tố low_
+    # Làm sạch stem nếu file đã từng có tiền tố sensitive_, low_, hoặc tên người
     clean_stem = stem
     p_lower = person.lower()
+    s_lower = sensitive_prefix.lower()
+
+    changed = True
+    while changed:
+        changed = False
+        if clean_stem.lower().startswith(f"{s_lower}_") or clean_stem.lower().startswith(f"{s_lower}-"):
+            clean_stem = clean_stem[len(sensitive_prefix) + 1:]
+            changed = True
+        if clean_stem.lower().startswith("low_") or clean_stem.lower().startswith("low-"):
+            clean_stem = clean_stem[4:]
+            changed = True
+
     if clean_stem.lower().startswith(f"{p_lower}_") or clean_stem.lower().startswith(f"{p_lower}-"):
         clean_stem = clean_stem[len(person) + 1:]
-    elif clean_stem.lower().startswith("low_"):
-        clean_stem = clean_stem[4:]
-        if clean_stem.lower().startswith(f"{p_lower}_") or clean_stem.lower().startswith(f"{p_lower}-"):
-            clean_stem = clean_stem[len(person) + 1:]
 
     new_stem = name_format.format(person=person, original=clean_stem)
+    if is_sensitive:
+        new_stem = f"{sensitive_prefix}_{new_stem}"
     return f"{new_stem}{suffix}"
 
 
 def is_already_processed(filename: str, known_person_names: Set[str], unknown_prefix: str) -> bool:
     """Kiểm tra xem tệp đã từng được xử lý hoặc gán nhãn trước đó hay chưa."""
     name_lower = filename.lower()
+    if name_lower.startswith("sensitive_") or name_lower.startswith("sensitive-"):
+        name_lower = name_lower[10:]
     if name_lower.startswith(f"{unknown_prefix.lower()}_") or name_lower.startswith(f"{unknown_prefix.lower()}-"):
         return True
     if name_lower.startswith("low_") or name_lower.startswith("low-"):
@@ -154,6 +172,8 @@ def is_already_processed(filename: str, known_person_names: Set[str], unknown_pr
 def extract_candidate_prefix(filename: str, unknown_prefix: str) -> Optional[str]:
     """Trích xuất tiền tố định danh người từ tên tệp."""
     name_lower = filename.lower()
+    if name_lower.startswith("sensitive_") or name_lower.startswith("sensitive-"):
+        name_lower = name_lower[10:]
     if name_lower.startswith("low_") or name_lower.startswith("low-"):
         name_lower = name_lower[4:]
 

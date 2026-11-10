@@ -1,6 +1,7 @@
 """Pipeline điều phối toàn bộ luồng xử lý: Rename, Cluster, Organize, Clean, Prepare."""
 
 import os
+import shutil
 import random
 import sys
 import logging
@@ -25,10 +26,12 @@ from facecls.io import (
     is_already_processed,
     extract_candidate_prefix,
     load_image_rgb,
+    generate_unique_path,
 )
 from facecls.cache import EmbeddingCache
 from facecls.engine import FaceEngine
 from facecls.matcher import KnownFaceIndex
+from facecls.sensitive import check_sensitive, check_sensitive_media
 
 logger = logging.getLogger("face_renamer")
 
@@ -69,6 +72,8 @@ def load_known_faces(
     exclude_set = {d.lower() for d in cfg.exclude_dirs}
     if target_unclassified:
         exclude_set.add(target_unclassified.name.lower())
+    exclude_set.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_set.add("sensitive")
 
     person_dirs = sorted(
         [d for d in dataset_root.iterdir() if d.is_dir() and d.name.lower() not in exclude_set],
@@ -145,10 +150,20 @@ def run_rename(
     cache: Optional[EmbeddingCache] = None,
     target_dir: Optional[str] = None,
     apply: bool = False,
+    sensitive_mode: Optional[str] = None,
+    sensitive_thresh: Optional[float] = None,
 ) -> dict:
     """Tác vụ 1: Nhận diện khuôn mặt và đổi tên tệp."""
     dataset_root = Path(cfg.dataset_root).expanduser().resolve()
     unclassified_dir = resolve_target_dir(target_dir, cfg.unclassified_dir, dataset_root)
+
+    # Xác định chế độ kiểm duyệt nhạy cảm
+    if sensitive_mode is not None:
+        active_sensitive_mode = sensitive_mode.lower().strip()
+    else:
+        active_sensitive_mode = cfg.sensitive_mode if cfg.enable_sensitive_check else "none"
+
+    active_sensitive_thresh = sensitive_thresh if sensitive_thresh is not None else cfg.sensitive_threshold
 
     logger = setup_logger(cfg.log_to_file, cfg.log_file, dataset_root)
     logger.info("=" * 60)
@@ -157,6 +172,8 @@ def run_rename(
     logger.info(f"📌 Nguồn         : {unclassified_dir}")
     logger.info(f"📌 Engine        : {cfg.engine} ({cfg.insightface_model})")
     logger.info(f"📌 Mode          : {'APPLY ✏️ (Đổi tên thật)' if apply else 'DRY-RUN 🔍 (Chỉ xem trước)'}")
+    if active_sensitive_mode in ("rename", "copy"):
+        logger.info(f"📌 NSFW Filter   : NudeNet (chế độ: {active_sensitive_mode.upper()} - ngưỡng: {active_sensitive_thresh})")
 
     if cache is None:
         cache = EmbeddingCache(dataset_root / cfg.cache_file)
@@ -249,14 +266,40 @@ def run_rename(
             stats["recognized"] += 1
             log_icon = "✅"
 
-        new_name = build_new_name(person, orig_name, fmt)
-        logger.info(f"  {log_icon} {orig_name} → {new_name}  [{reason}]")
+        # Kiểm tra nội dung nhạy cảm NudeNet
+        is_sensitive = False
+        sens_info = None
+        sens_copy_name = None
+        if active_sensitive_mode in ("rename", "copy"):
+            if ext in VALID_VIDEO_EXTENSIONS:
+                sens_info = check_sensitive_media(fpath, frames=frames, threshold=active_sensitive_thresh)
+            else:
+                sens_info = check_sensitive(fpath, threshold=active_sensitive_thresh)
+            is_sensitive = sens_info.get("is_sensitive", False)
+            if is_sensitive:
+                stats["sensitive"] = stats.get("sensitive", 0) + 1
+
+        if is_sensitive and active_sensitive_mode == "rename":
+            new_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+        else:
+            new_name = build_new_name(person, orig_name, fmt, is_sensitive=False)
+
+        sens_tag = f" [🔞 {sens_info['max_category_vi']} {sens_info['max_score']}%]" if is_sensitive else ""
+        if is_sensitive and active_sensitive_mode == "copy":
+            sens_copy_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+            logger.info(f"  {log_icon} {orig_name} → {new_name} (và sao chép bản {sens_copy_name}){sens_tag}  [{reason}]")
+        else:
+            logger.info(f"  {log_icon} {orig_name} → {new_name}{sens_tag}  [{reason}]")
 
         if apply:
             try:
-                safe_rename(fpath, new_name)
+                new_path = safe_rename(fpath, new_name)
+                if is_sensitive and active_sensitive_mode == "copy" and sens_copy_name:
+                    copy_dest = generate_unique_path(new_path.parent, sens_copy_name)
+                    shutil.copy2(str(new_path), str(copy_dest))
+                    stats["sensitive_copies"] = stats.get("sensitive_copies", 0) + 1
             except Exception as e:
-                logger.error(f"  ❌ Lỗi đổi tên {orig_name}: {e}")
+                logger.error(f"  ❌ Lỗi đổi tên/sao chép {orig_name}: {e}")
                 stats["error"] += 1
 
     cache.save()
@@ -268,6 +311,10 @@ def run_rename(
     logger.info(f"  ⚠️  Độ tin cậy thấp    : {stats['low_confidence']} (< {cfg.low_confidence_threshold}%)")
     logger.info(f"  ❓ Không nhận diện (Unknown): {stats['unknown']}")
     logger.info(f"  ⏭️  Đã xử lý trước     : {stats['skipped']}")
+    if active_sensitive_mode in ("rename", "copy"):
+        logger.info(f"  🔞 Phát hiện nhạy cảm  : {stats.get('sensitive', 0)}")
+        if active_sensitive_mode == "copy":
+            logger.info(f"  📋 Bản sao nhạy cảm    : {stats.get('sensitive_copies', 0)}")
     logger.info(f"  ❌ Lỗi đổi tên         : {stats['error']}")
     if not apply:
         logger.info("\n  💡 Chạy với '--apply' (hoặc '-a') để thực sự áp dụng đổi tên.")
@@ -316,6 +363,8 @@ def run_cluster(
 
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
     exclude_dirs.add(unclassified_dir.name.lower())
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
     known_person_names = {
         d.name.lower() for d in dataset_root.iterdir()
         if d.is_dir() and d.name.lower() not in exclude_dirs
@@ -471,6 +520,8 @@ def run_organize(
 
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
     exclude_dirs.add(unclassified_dir.name.lower())
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
 
     person_dirs: Dict[str, Path] = {
         d.name.lower(): d for d in dataset_root.iterdir()
@@ -493,7 +544,11 @@ def run_organize(
         if n_lower.startswith(f"{cfg.unknown_prefix.lower()}_") or n_lower.startswith(f"{cfg.unknown_prefix.lower()}-"):
             continue
 
-        clean_name = img.name[4:] if (n_lower.startswith("low_") or n_lower.startswith("low-")) else img.name
+        clean_name = img.name
+        if clean_name.lower().startswith(f"{cfg.sensitive_prefix.lower()}_") or clean_name.lower().startswith(f"{cfg.sensitive_prefix.lower()}-"):
+            clean_name = clean_name[len(cfg.sensitive_prefix) + 1:]
+        if clean_name.lower().startswith("low_") or clean_name.lower().startswith("low-"):
+            clean_name = clean_name[4:]
         c_lower = clean_name.lower()
 
         matched = any(
@@ -575,8 +630,14 @@ def run_organize(
             skipped_unknown += 1
             continue
 
-        is_low = n_lower.startswith("low_") or n_lower.startswith("low-")
-        clean_name = img.name[4:] if is_low else img.name
+        is_sens = n_lower.startswith(f"{cfg.sensitive_prefix.lower()}_") or n_lower.startswith(f"{cfg.sensitive_prefix.lower()}-")
+        clean_name = img.name
+        if is_sens:
+            clean_name = clean_name[len(cfg.sensitive_prefix) + 1:]
+
+        is_low = clean_name.lower().startswith("low_") or clean_name.lower().startswith("low-")
+        if is_low:
+            clean_name = clean_name[4:]
 
         if is_low and not include_low:
             click.echo(f"  ⏭️  Bỏ qua (Low confidence): {img.name}")
@@ -594,12 +655,19 @@ def run_organize(
             unmatched_count += 1
             continue
 
-        tag = "⚠️  LOW" if is_low else "✅ HIGH"
-        click.echo(f"  🚚 [{tag}] {img.name} → {matched_target_dir.name}/")
+        if is_sens:
+            dest_dir = dataset_root / cfg.sensitive_prefix
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            tag = "🔞 SENSITIVE"
+            click.echo(f"  🚚 [{tag}] {img.name} → {cfg.sensitive_prefix}/")
+        else:
+            dest_dir = matched_target_dir
+            tag = "⚠️  LOW" if is_low else "✅ HIGH"
+            click.echo(f"  🚚 [{tag}] {img.name} → {matched_target_dir.name}/")
 
         if apply:
             try:
-                safe_move(img, matched_target_dir)
+                safe_move(img, dest_dir)
                 moved_count += 1
             except Exception as e:
                 click.echo(f"  ❌ Lỗi di chuyển {img.name}: {e}", err=True)
@@ -625,6 +693,8 @@ def run_clean(
     unclassified_name = cfg.unclassified_dir
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
     exclude_dirs.add(unclassified_name.lower())
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
 
     if target_dir:
         p = resolve_target_dir(target_dir, unclassified_name, dataset_root)
@@ -667,7 +737,9 @@ def run_clean(
         # Bước A: Đổi sang tên tạm trung gian để tránh xung đột
         pairs = []
         for i, f in enumerate(files, start=1):
-            target_name = f"{p_name}_{i}{f.suffix.lower()}"
+            is_sens = f.name.lower().startswith(f"{cfg.sensitive_prefix.lower()}_") or f.name.lower().startswith(f"{cfg.sensitive_prefix.lower()}-")
+            sens_tag = f"{cfg.sensitive_prefix}_" if is_sens else ""
+            target_name = f"{sens_tag}{p_name}_{i}{f.suffix.lower()}"
             pairs.append((f, target_name))
             click.echo(f"   • {f.name} → {target_name}")
 
@@ -741,6 +813,8 @@ def run_prepare(
 
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
     exclude_dirs.add(dest_dir.name.lower())
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
 
     person_dirs = sorted([
         d for d in dataset_root.iterdir()

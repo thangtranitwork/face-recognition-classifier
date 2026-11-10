@@ -325,10 +325,23 @@
               </div>
 
               <div class="flex flex-wrap items-center gap-2.5">
-                <label class="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none mr-2">
+                <label class="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none mr-1">
                   <input type="checkbox" id="scan-force-check" class="w-3.5 h-3.5 rounded bg-[#090B0F] border-white/20 text-emerald-500 focus:ring-0">
                   <span>Quét lại toàn bộ (Force)</span>
                 </label>
+
+                <!-- NSFW Sensitive Mode Selector -->
+                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 border border-white/[0.08] text-xs">
+                  <span class="text-zinc-400 flex items-center gap-1 font-mono text-[11px]">
+                    <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span>NSFW NudeNet:</span>
+                  </span>
+                  <select id="scan-sensitive-mode" class="bg-transparent text-xs text-zinc-200 font-semibold focus:outline-none cursor-pointer">
+                    <option value="none" class="bg-zinc-900 text-zinc-400">Tắt kiểm duyệt</option>
+                    <option value="rename" class="bg-zinc-900 text-amber-300 font-bold" selected>🔞 Đổi tên thẳng (sensitive_*)</option>
+                    <option value="copy" class="bg-zinc-900 text-cyan-300 font-bold">📋 Sao chép 1 bản (copy)</option>
+                  </select>
+                </div>
 
                 <button onclick="runScan(false)" id="btn-scan" class="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.09] text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-2 transition active:scale-95">
                   <i data-lucide="eye" class="w-3.5 h-3.5 text-zinc-400"></i>
@@ -367,7 +380,7 @@
             </div>
 
             <!-- Stats Bar -->
-            <div id="scan-stats-bar" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-white/[0.06]">
+            <div id="scan-stats-bar" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-3 border-t border-white/[0.06]">
               <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
                 <span class="text-xs text-zinc-400">Nhận diện khớp</span>
                 <span id="scan-stat-rec" class="font-mono font-bold text-emerald-400 text-sm">0</span>
@@ -383,6 +396,10 @@
               <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
                 <span class="text-xs text-zinc-400">Đã gắn nhãn trước</span>
                 <span id="scan-stat-skip" class="font-mono font-bold text-cyan-400 text-sm">0</span>
+              </div>
+              <div class="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 flex items-center justify-between">
+                <span class="text-xs text-purple-300 flex items-center gap-1">🔞 Nhạy cảm (NSFW)</span>
+                <span id="scan-stat-sensitive" class="font-mono font-bold text-purple-400 text-sm">0</span>
               </div>
             </div>
           </div>
@@ -580,16 +597,41 @@
             </div>
 
             <!-- Section 1: Discovered Potential / Candidate Images Real-Time Grid -->
-            <div class="space-y-2 pt-2 border-t border-white/[0.06]">
-              <div class="flex items-center justify-between">
+            <div class="space-y-3 pt-3 border-t border-white/[0.06]">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div class="flex items-center gap-2">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#06B6D4]"></span>
                   <h4 class="text-xs font-bold text-zinc-200">Ảnh tiềm năng đang quét & kiểm tra (<span id="dl-candidates-count" class="font-mono text-cyan-400">0</span>)</h4>
                 </div>
-                <span class="text-[10px] font-mono text-zinc-500">Hiển thị trực tiếp ảnh bài viết Instagram & Web</span>
+
+                <!-- Candidate Filter Tabs -->
+                <div class="flex items-center gap-1 text-[11px] font-medium bg-black/40 p-1 rounded-xl border border-white/[0.06] overflow-x-auto">
+                  <button type="button" onclick="setCandidateFilter('all')" id="btn-cand-filter-all" class="px-2.5 py-1 rounded-lg text-white bg-white/10 transition font-semibold">Tất cả (<span id="count-cand-all">0</span>)</button>
+                  <button type="button" onclick="setCandidateFilter('accepted')" id="btn-cand-filter-accepted" class="px-2.5 py-1 rounded-lg text-emerald-400 hover:bg-white/5 transition">Đã khớp (<span id="count-cand-accepted">0</span>)</button>
+                  <button type="button" onclick="setCandidateFilter('rejected')" id="btn-cand-filter-rejected" class="px-2.5 py-1 rounded-lg text-rose-400 hover:bg-white/5 transition">Bị loại (<span id="count-cand-rejected">0</span>)</button>
+                  <button type="button" onclick="setCandidateFilter('no_face')" id="btn-cand-filter-noface" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:bg-white/5 transition">Không rõ mặt (<span id="count-cand-noface">0</span>)</button>
+                </div>
               </div>
 
-              <div id="dl-candidates-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-72 overflow-y-auto p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+              <!-- Action Bar for Failed / Unsaved Candidates -->
+              <div id="dl-cand-action-bar" class="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-rose-950/20 via-[#0A0C11] to-black/40 border border-white/[0.07]">
+                <div class="flex items-center gap-3">
+                  <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer select-none">
+                    <input type="checkbox" id="dl-select-all-failed" onchange="toggleSelectAllFailed(this.checked)" class="w-4 h-4 rounded bg-[#090B0F] border-rose-500/40 text-rose-500 focus:ring-0">
+                    <span class="font-semibold text-rose-300 hover:text-rose-200 transition">Chọn tất cả ảnh bị loại</span>
+                  </label>
+                  <span class="text-[11px] text-zinc-400 font-mono">Đã chọn: <span id="dl-selected-failed-count" class="font-bold text-amber-400">0</span> ảnh</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button type="button" id="btn-save-selected-failed" onclick="saveSelectedFailedCandidates()" disabled class="px-3.5 py-1.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600/80 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    <span id="btn-save-selected-text">Lưu ảnh đã chọn vào thư mục</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="dl-candidates-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-80 overflow-y-auto p-2.5 rounded-xl bg-black/40 border border-white/[0.04]">
                 <!-- Candidate cards populate here in real-time -->
               </div>
             </div>
@@ -679,6 +721,40 @@
                   <option value="largest">largest (Chọn khuôn mặt có diện tích lớn nhất ở gần nhất)</option>
                   <option value="reject">reject (Bỏ qua ảnh có nhiều người)</option>
                 </select>
+              </div>
+
+              <!-- NudeNet NSFW Sensitive Settings -->
+              <div class="pt-4 border-t border-white/[0.06] space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                      <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400"></i>
+                      <span>Kiểm duyệt ảnh nhạy cảm (NudeNet NSFW)</span>
+                    </h4>
+                    <p class="text-[11px] text-zinc-500">Tự động phát hiện và xử lý nội dung nhạy cảm / hở hang khi nhận diện.</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="setting-sensitive-enable" class="sr-only peer">
+                    <div class="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-300 mb-1.5">Chế độ xử lý ảnh nhạy cảm</label>
+                  <select id="setting-sensitive-mode" class="w-full px-3.5 py-2 text-xs rounded-xl bg-[#090B0F] border border-white/[0.08] text-zinc-200 focus:outline-none">
+                    <option value="rename">Đổi tên trực tiếp với tiền tố sensitive_ (sensitive_*)</option>
+                    <option value="copy">Đổi tên bình thường và tạo thêm 1 bản sao sensitive (copy)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="text-xs font-medium text-zinc-300">Ngưỡng phát hiện NudeNet (Threshold)</label>
+                    <span id="label-sensitive-thresh" class="font-mono text-xs text-purple-400 font-bold">0.35</span>
+                  </div>
+                  <input type="range" id="setting-sensitive-thresh" min="0.1" max="0.9" step="0.05" value="0.35" oninput="updateSettingLabel('sensitive-thresh', this.value)" class="w-full accent-purple-400">
+                  <p class="text-[11px] text-zinc-500 mt-1">Khuyên dùng 0.35 - 0.40 để phát hiện đầy đủ nội dung bikini / đồ lót / vùng nhạy cảm.</p>
+                </div>
               </div>
             </div>
 
@@ -1026,13 +1102,30 @@
       const isRenamed = (r.status === 'renamed_now' || (r.new_name && r.new_name !== r.original && r.status !== 'already_named'));
       const hasProposal = (r.new_name && r.new_name !== currentOnDisk && r.status !== 'already_named' && r.status !== 'renamed_now');
 
+      const previewDesc = `${badgeText}${r.is_sensitive ? ' | 🔞 ' + (r.sensitive_info?.max_category_vi || 'Nhạy cảm') + ' (' + (r.sensitive_info?.max_score || 0) + '%)' : ''}`;
+
+      window.scanItemsMap = window.scanItemsMap || {};
+      const cardId = 'scan_' + (r.url ? r.url.replace(/[^a-zA-Z0-9]/g, '_') : Math.random().toString(36).substring(2, 9));
+      window.scanItemsMap[cardId] = r;
+
+      const isVideoFile = r.is_video || (r.url && (r.url.toLowerCase().includes('.mp4') || r.url.toLowerCase().includes('.mov') || r.url.toLowerCase().includes('.webm')));
+
       return `
         <div class="double-bezel p-3 rounded-2xl flex flex-col space-y-2.5 relative group hover:border-white/20 transition-all bg-[#0B0D13]">
-          <!-- Image Core Container with Double Bezel -->
-          <div onclick="openImagePreview('${r.url}', '${currentOnDisk}', '${badgeText}')" class="aspect-[4/3] rounded-xl bg-black/80 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
-            <img src="${r.url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]">
+          <!-- Image/Video Core Container with Double Bezel -->
+          <div onclick="openScanItemPreview('${cardId}')" class="aspect-[4/3] rounded-xl bg-black/80 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
+            ${isVideoFile ? `
+              <video src="${r.url}" preload="metadata" muted playsinline class="w-full h-full object-cover pointer-events-none"></video>
+              <div class="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+                <div class="w-9 h-9 rounded-full bg-black/60 border border-white/30 flex items-center justify-center text-white backdrop-blur-sm shadow-xl">
+                  <i data-lucide="play" class="w-4 h-4 ml-0.5 text-cyan-400"></i>
+                </div>
+              </div>
+            ` : `
+              <img src="${r.url}" onerror="handleImgError(this)" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]">
+            `}
             
-            <!-- Fallback in case of image load error -->
+            <!-- Fallback in case of media load error -->
             <div class="img-fallback hidden absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/95 text-zinc-500 text-xs p-3 text-center">
               <i data-lucide="image-off" class="w-6 h-6 mb-1 text-zinc-600"></i>
               <span class="font-mono text-[10px] truncate max-w-full text-zinc-400">${currentOnDisk}</span>
@@ -1041,6 +1134,14 @@
             <!-- Surgical HUD Bounding Box -->
             ${r.bbox ? `
               <div class="absolute hud-box hud-bracket rounded pointer-events-none" style="left:${r.bbox.x*100}%; top:${r.bbox.y*100}%; width:${r.bbox.w*100}%; height:${r.bbox.h*100}%"></div>
+            ` : ''}
+
+            <!-- Sensitive / NSFW Corner Badge -->
+            ${r.is_sensitive ? `
+              <div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold tracking-tight shadow-xl backdrop-blur-md bg-purple-600/90 text-white border border-purple-400/40 flex items-center gap-1 z-10 animate-fade-in" title="${r.sensitive_info?.max_category || 'Sensitive'} (${r.sensitive_info?.max_score}%)">
+                <span>🔞 ${r.sensitive_info?.max_category_vi || 'Nhạy cảm'}</span>
+                <span class="text-purple-200">(${r.sensitive_info?.max_score}%)</span>
+              </div>
             ` : ''}
 
             <!-- Corner Badge Attached to Reticle -->
@@ -1068,6 +1169,13 @@
               </div>
             ` : '')}
 
+            ${r.is_sensitive && r.sensitive_mode === 'copy' && r.sensitive_copy_name ? `
+              <div class="text-[11px] font-mono text-cyan-300 truncate flex items-center gap-1 bg-cyan-950/30 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                <span class="text-cyan-400 font-bold shrink-0">📋 Bản sao:</span>
+                <span class="truncate font-semibold text-cyan-200" title="${r.sensitive_copy_name}">→ ${r.sensitive_copy_name}</span>
+              </div>
+            ` : ''}
+
             <p class="text-[10px] text-zinc-500 truncate font-mono">${r.reason || ''}</p>
           </div>
         </div>
@@ -1076,6 +1184,7 @@
 
     function runScan(apply = false) {
       const force = document.getElementById('scan-force-check')?.checked || false;
+      const sensitiveMode = document.getElementById('scan-sensitive-mode')?.value || 'none';
       const btnScan = document.getElementById('btn-scan');
       const btnApply = document.getElementById('btn-apply-rename');
       const btnCancel = document.getElementById('btn-scan-cancel');
@@ -1108,10 +1217,12 @@
       document.getElementById('scan-stat-low').innerText = '0';
       document.getElementById('scan-stat-unk').innerText = '0';
       document.getElementById('scan-stat-skip').innerText = '0';
+      const statSens = document.getElementById('scan-stat-sensitive');
+      if (statSens) statSens.innerText = '0';
 
       grid.innerHTML = '';
 
-      const url = `/api/scan/stream?apply=${apply}&force=${force}`;
+      const url = `/api/scan/stream?apply=${apply}&force=${force}&sensitive_mode=${encodeURIComponent(sensitiveMode)}`;
       scanEventSource = new EventSource(url);
 
       scanEventSource.onmessage = function(e) {
@@ -1135,7 +1246,26 @@
             document.getElementById('scan-stat-low').innerText = data.stats.low_confidence || 0;
             document.getElementById('scan-stat-unk').innerText = data.stats.unknown || 0;
             document.getElementById('scan-stat-skip').innerText = data.stats.skipped || 0;
+            const sensEl = document.getElementById('scan-stat-sensitive');
+            if (sensEl) sensEl.innerText = data.stats.sensitive || 0;
           }
+
+          // Append card
+          const cardHtml = buildScanCardHtml(data.item);
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = cardHtml;
+          const cardEl = tempDiv.firstElementChild;
+          grid.appendChild(cardEl);
+          lucide.createIcons();
+        } else if (data.type === 'complete') {
+          progressBar.style.width = '100%';
+          progressStatus.innerText = apply ? '✅ Hoàn tất! Đã đổi tên các tệp nhận diện thành công.' : '✅ Hoàn tất quét xem trước tất cả tệp.';
+          btnCancel.classList.add('hidden');
+          btnScan.disabled = false;
+          btnApply.disabled = false;
+          btnScan.classList.remove('opacity-50');
+          btnApply.classList.remove('opacity-50');
+          scanEventSource.close();
 
           // Append card
           const cardHtml = buildScanCardHtml(data.item);
@@ -1447,6 +1577,316 @@
       updateDestPreview();
     }
 
+    // ==============================================================
+    // CANDIDATE IMAGE MANAGEMENT & MANUAL SAVE CONTROLLER
+    // ==============================================================
+    let downloadCandidates = new Map();
+    let currentCandidateFilter = 'all'; // 'all', 'accepted', 'rejected', 'no_face'
+    let activeDownloadTarget = '';
+    let activeDownloadPrefix = '';
+    let currentPreviewCandidateId = null;
+
+    function setCandidateFilter(filterType) {
+      currentCandidateFilter = filterType;
+      const btnAll = document.getElementById('btn-cand-filter-all');
+      const btnAcc = document.getElementById('btn-cand-filter-accepted');
+      const btnRej = document.getElementById('btn-cand-filter-rejected');
+      const btnNof = document.getElementById('btn-cand-filter-noface');
+
+      const allBtns = [btnAll, btnAcc, btnRej, btnNof];
+      allBtns.forEach(b => {
+        if (b) {
+          b.classList.remove('bg-white/10', 'font-semibold');
+        }
+      });
+
+      const activeBtn = filterType === 'all' ? btnAll : (filterType === 'accepted' ? btnAcc : (filterType === 'rejected' ? btnRej : btnNof));
+      if (activeBtn) {
+        activeBtn.classList.add('bg-white/10', 'font-semibold');
+      }
+
+      applyCandidateFilter();
+    }
+
+    function applyCandidateFilter() {
+      const cards = document.querySelectorAll('#dl-candidates-grid > div[data-cand-id]');
+      cards.forEach(card => {
+        const id = parseInt(card.getAttribute('data-cand-id'), 10);
+        const cand = downloadCandidates.get(id);
+        if (!cand) return;
+
+        let show = true;
+        if (currentCandidateFilter === 'accepted') {
+          show = (cand.status === 'accepted' || cand.status === 'manually_saved');
+        } else if (currentCandidateFilter === 'rejected') {
+          show = (cand.status === 'rejected');
+        } else if (currentCandidateFilter === 'no_face') {
+          show = (cand.status === 'no_face' || cand.status === 'error');
+        }
+        card.classList.toggle('hidden', !show);
+      });
+    }
+
+    function updateCandidateFilterCounts() {
+      let countAll = downloadCandidates.size;
+      let countAcc = 0;
+      let countRej = 0;
+      let countNof = 0;
+
+      for (const cand of downloadCandidates.values()) {
+        if (cand.status === 'accepted' || cand.status === 'manually_saved') {
+          countAcc++;
+        } else if (cand.status === 'rejected') {
+          countRej++;
+        } else if (cand.status === 'no_face' || cand.status === 'error') {
+          countNof++;
+        }
+      }
+
+      const elAll = document.getElementById('count-cand-all');
+      const elAcc = document.getElementById('count-cand-accepted');
+      const elRej = document.getElementById('count-cand-rejected');
+      const elNof = document.getElementById('count-cand-noface');
+
+      if (elAll) elAll.innerText = countAll;
+      if (elAcc) elAcc.innerText = countAcc;
+      if (elRej) elRej.innerText = countRej;
+      if (elNof) elNof.innerText = countNof;
+    }
+
+    function toggleCandidateSelection(id, isChecked) {
+      const cand = downloadCandidates.get(id);
+      if (cand) {
+        cand.selected = isChecked;
+        const card = document.getElementById(`cand-card-${id}`);
+        if (card) {
+          if (isChecked) {
+            card.classList.add('ring-2', 'ring-cyan-400', 'bg-cyan-950/30');
+          } else {
+            card.classList.remove('ring-2', 'ring-cyan-400', 'bg-cyan-950/30');
+          }
+        }
+      }
+      updateSelectedFailedCount();
+    }
+
+    function toggleSelectAllFailed(isChecked) {
+      for (const cand of downloadCandidates.values()) {
+        const isFailed = (cand.status === 'rejected' || cand.status === 'no_face' || cand.status === 'error');
+        if (isFailed && !cand.saved) {
+          cand.selected = isChecked;
+          const chk = document.getElementById(`cand-chk-${cand.id}`);
+          if (chk) chk.checked = isChecked;
+          const card = document.getElementById(`cand-card-${cand.id}`);
+          if (card) {
+            if (isChecked) {
+              card.classList.add('ring-2', 'ring-cyan-400', 'bg-cyan-950/30');
+            } else {
+              card.classList.remove('ring-2', 'ring-cyan-400', 'bg-cyan-950/30');
+            }
+          }
+        }
+      }
+      updateSelectedFailedCount();
+    }
+
+    function updateSelectedFailedCount() {
+      let selectedCount = 0;
+      for (const cand of downloadCandidates.values()) {
+        if (cand.selected && !cand.saved) {
+          selectedCount++;
+        }
+      }
+
+      const countEl = document.getElementById('dl-selected-failed-count');
+      if (countEl) countEl.innerText = selectedCount;
+
+      const btn = document.getElementById('btn-save-selected-failed');
+      if (btn) {
+        btn.disabled = (selectedCount === 0);
+      }
+    }
+
+    async function saveCandidatesBatch(itemsToSave) {
+      if (!itemsToSave || itemsToSave.length === 0) return false;
+
+      const targetDir = activeDownloadTarget || document.getElementById('dl-stream-dest-label')?.innerText || '';
+      const prefix = activeDownloadPrefix || '';
+
+      const payload = {
+        target_dir: targetDir,
+        prefix: prefix,
+        items: itemsToSave.map(c => ({ id: c.id, url: c.url, desc: c.desc }))
+      };
+
+      try {
+        const res = await fetch('/api/download/save_candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || 'Lỗi khi lưu ảnh', 'error');
+          return false;
+        }
+
+        if (data.saved && data.saved.length > 0) {
+          const grid = document.getElementById('dl-stream-grid');
+          let currentSavedCount = parseInt(document.getElementById('dl-saved-count')?.innerText || '0', 10);
+
+          data.saved.forEach(savedItem => {
+            const cand = downloadCandidates.get(savedItem.id);
+            if (cand) {
+              cand.saved = true;
+              cand.selected = false;
+              cand.status = 'manually_saved';
+
+              const card = document.getElementById(`cand-card-${cand.id}`);
+              if (card) {
+                card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-emerald-950/20 border border-emerald-500/60 shadow-sm transition-all';
+                card.classList.remove('ring-2', 'ring-cyan-400', 'bg-cyan-950/30');
+              }
+              const chk = document.getElementById(`cand-chk-${cand.id}`);
+              if (chk) chk.classList.add('hidden');
+              const saveBtn = document.getElementById(`cand-save-btn-${cand.id}`);
+              if (saveBtn) saveBtn.classList.add('hidden');
+
+              const badge = document.getElementById(`cand-status-${cand.id}`);
+              if (badge) {
+                badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-bold text-center truncate backdrop-blur-md bg-emerald-600/80 text-emerald-100 border border-emerald-500/80 pointer-events-none';
+                badge.innerText = '✅ Đã lưu thủ công';
+              }
+            }
+
+            if (grid) {
+              const savedCard = document.createElement('div');
+              savedCard.className = 'double-bezel p-2 rounded-xl animate-fade-in flex flex-col space-y-1 bg-[#0A0C11] border border-white/[0.08]';
+              savedCard.innerHTML = `
+                <div onclick="openImagePreview('${savedItem.url}', '${savedItem.filename}', 'Đã lưu thủ công')" class="aspect-square rounded-lg bg-black/60 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-emerald-500/40 transition">
+                  <img src="${savedItem.url}" onerror="handleImgError(this)" class="w-full h-full object-cover">
+                  <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-600 text-white shadow">Thủ công</span>
+                </div>
+                <span class="block pt-1 text-[10px] font-mono text-zinc-300 truncate px-0.5 font-semibold">${savedItem.filename}</span>
+              `;
+              grid.appendChild(savedCard);
+            }
+
+            currentSavedCount++;
+          });
+
+          document.getElementById('dl-saved-count').innerText = currentSavedCount;
+          updateSelectedFailedCount();
+          updateCandidateFilterCounts();
+          applyCandidateFilter();
+
+          const chkAll = document.getElementById('dl-select-all-failed');
+          if (chkAll) chkAll.checked = false;
+
+          showToast(data.message || `Đã lưu thành công ${data.saved.length} ảnh!`, 'success');
+          if (window.lucide) lucide.createIcons();
+          return true;
+        } else {
+          showToast('Không lưu được ảnh nào trong danh sách', 'warn');
+          return false;
+        }
+      } catch (err) {
+        showToast('Lỗi kết nối khi lưu ảnh: ' + err.message, 'error');
+        return false;
+      }
+    }
+
+    async function saveSelectedFailedCandidates() {
+      const selectedList = [];
+      for (const cand of downloadCandidates.values()) {
+        if (cand.selected && !cand.saved) {
+          selectedList.push(cand);
+        }
+      }
+
+      if (selectedList.length === 0) {
+        showToast('Chưa có ảnh nào được chọn', 'info');
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-selected-failed');
+      const btnText = document.getElementById('btn-save-selected-text');
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = `Đang lưu ${selectedList.length} ảnh...`;
+
+      await saveCandidatesBatch(selectedList);
+
+      if (btnText) btnText.innerText = 'Lưu ảnh đã chọn vào thư mục';
+      updateSelectedFailedCount();
+    }
+
+    async function saveSingleCandidate(e, id) {
+      if (e) e.stopPropagation();
+      const cand = downloadCandidates.get(id);
+      if (!cand || cand.saved) return;
+
+      const saveBtn = document.getElementById(`cand-save-btn-${id}`);
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="animate-spin text-[8px]">⌛</span>';
+      }
+
+      const ok = await saveCandidatesBatch([cand]);
+      if (!ok && saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '+ Lưu';
+      }
+    }
+
+    function openCandidatePreview(id) {
+      const cand = downloadCandidates.get(id);
+      if (!cand) return;
+      currentPreviewCandidateId = id;
+
+      const saveCandBtn = document.getElementById('preview-modal-save-cand-btn');
+      const saveCandText = document.getElementById('preview-modal-save-cand-text');
+      if (saveCandBtn) {
+        if (cand.saved) {
+          saveCandBtn.classList.remove('hidden');
+          saveCandBtn.disabled = true;
+          saveCandBtn.className = 'px-3 py-1.5 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-bold flex items-center gap-1.5 transition mr-2 cursor-default';
+          if (saveCandText) saveCandText.innerText = '✅ Đã lưu';
+        } else {
+          saveCandBtn.classList.remove('hidden');
+          saveCandBtn.disabled = false;
+          saveCandBtn.className = 'px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-lg mr-2 active:scale-95';
+          if (saveCandText) saveCandText.innerText = 'Lưu ảnh này vào thư mục';
+        }
+      }
+
+      let sub = cand.desc || '';
+      if (cand.sim !== null && cand.sim !== undefined) {
+        sub += ` | Độ khớp: ${cand.sim}%`;
+      }
+      if (cand.reason) {
+        sub += ` (${cand.reason})`;
+      }
+      openImagePreview(cand.url, `Ứng viên #${cand.id}`, sub);
+    }
+
+    async function saveCurrentPreviewCandidate() {
+      if (!currentPreviewCandidateId) return;
+      const cand = downloadCandidates.get(currentPreviewCandidateId);
+      if (!cand || cand.saved) return;
+
+      const saveCandBtn = document.getElementById('preview-modal-save-cand-btn');
+      const saveCandText = document.getElementById('preview-modal-save-cand-text');
+      if (saveCandBtn) saveCandBtn.disabled = true;
+      if (saveCandText) saveCandText.innerText = 'Đang lưu...';
+
+      const ok = await saveCandidatesBatch([cand]);
+      if (ok && saveCandBtn && saveCandText) {
+        saveCandBtn.className = 'px-3 py-1.5 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-bold flex items-center gap-1.5 transition mr-2 cursor-default';
+        saveCandText.innerText = '✅ Đã lưu';
+      }
+    }
+
     let downloadEventSource = null;
 
     async function cancelDownload() {
@@ -1496,6 +1936,18 @@
       const candidatesGrid = document.getElementById('dl-candidates-grid');
       candidatesGrid.innerHTML = '';
 
+      downloadCandidates.clear();
+      activeDownloadTarget = '';
+      activeDownloadPrefix = '';
+      currentCandidateFilter = 'all';
+      const selFailedEl = document.getElementById('dl-selected-failed-count');
+      if (selFailedEl) selFailedEl.innerText = '0';
+      const btnSaveSel = document.getElementById('btn-save-selected-failed');
+      if (btnSaveSel) btnSaveSel.disabled = true;
+      const chkAllFailed = document.getElementById('dl-select-all-failed');
+      if (chkAllFailed) chkAllFailed.checked = false;
+      updateCandidateFilterCounts();
+
       document.getElementById('dl-candidates-count').innerText = '0';
       document.getElementById('dl-saved-count').innerText = '0';
 
@@ -1537,6 +1989,8 @@
           const targetStr = msg.unlimited ? 'Toàn bộ (∞)' : `${msg.count} ảnh`;
           document.getElementById('dl-stream-status').innerText = `Đang tìm kiếm cho: "${msg.query}" (${modeStr} - Mục tiêu: ${targetStr})`;
           document.getElementById('dl-stream-dest-label').innerText = msg.target;
+          activeDownloadTarget = msg.target || '';
+          activeDownloadPrefix = msg.prefix || '';
         } else if (msg.type === 'info') {
           document.getElementById('dl-stream-status').innerText = msg.message;
         } else if (msg.type === 'anchor_established') {
@@ -1547,55 +2001,100 @@
         } else if (msg.type === 'candidate_found') {
           candidateCount++;
           document.getElementById('dl-candidates-count').innerText = candidateCount;
+
+          downloadCandidates.set(msg.id, {
+            id: msg.id,
+            url: msg.url,
+            desc: msg.desc || '',
+            source: msg.source || '',
+            status: 'evaluating',
+            sim: null,
+            reason: '',
+            selected: false,
+            saved: false
+          });
+
           const proxyUrl = msg.url.startsWith('data:') ? msg.url : `/api/proxy_image?url=${encodeURIComponent(msg.url)}`;
           const card = document.createElement('div');
           card.id = `cand-card-${msg.id}`;
+          card.setAttribute('data-cand-id', msg.id);
           card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-[#0A0C11] border border-white/[0.07] transition-all animate-fade-in';
-          const avatarBadge = msg.is_avatar ? `<span class="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500 text-black shadow">👑 Avatar</span>` : '';
+          const avatarBadge = msg.is_avatar ? `<span class="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500 text-black shadow">👑 Avatar</span>` : '';
           const sourceTag = msg.source === 'video' ? 'VID' : (msg.source === 'facebook' ? 'FB' : (msg.source === 'instagram' ? 'IG' : 'Web'));
           card.innerHTML = `
-            <div onclick="openImagePreview('${msg.url}', 'Ứng viên #${msg.id}', '${msg.desc || ''}')" class="aspect-square rounded-lg bg-black/60 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
+            <div onclick="openCandidatePreview(${msg.id})" class="aspect-square rounded-lg bg-black/60 overflow-hidden relative flex items-center justify-center cursor-pointer group-hover:ring-1 group-hover:ring-white/20 transition">
               <img id="cand-img-${msg.id}" src="${proxyUrl}" onerror="this.onerror=null; this.src='${msg.url}'; this.referrerPolicy='no-referrer';" loading="lazy" class="w-full h-full object-cover">
               ${avatarBadge}
-              <div id="cand-status-${msg.id}" class="absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-cyan-500/30 text-cyan-200 border border-cyan-500/40">
+              <label id="cand-chk-wrap-${msg.id}" onclick="event.stopPropagation()" class="absolute top-1 right-1 z-10 hidden cursor-pointer bg-black/70 rounded p-0.5 hover:bg-black/90 transition shadow" title="Chọn ảnh này để lưu">
+                <input type="checkbox" id="cand-chk-${msg.id}" onchange="toggleCandidateSelection(${msg.id}, this.checked)" class="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-900 text-rose-500 focus:ring-0 cursor-pointer">
+              </label>
+              <div id="cand-status-${msg.id}" class="absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 pointer-events-none">
                 ⏳ Đang kiểm tra...
               </div>
             </div>
-            <span class="block text-[8px] font-mono text-zinc-400 truncate px-0.5" title="${msg.desc || msg.url}">#${msg.id} ${sourceTag}</span>
+            <div class="flex items-center justify-between px-0.5 pt-0.5 text-[8px] font-mono text-zinc-400">
+              <span class="truncate" title="${msg.desc || msg.url}">#${msg.id} ${sourceTag}</span>
+              <button type="button" id="cand-save-btn-${msg.id}" onclick="saveSingleCandidate(event, ${msg.id})" class="hidden px-1.5 py-0.5 rounded bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold transition shrink-0 ml-1 active:scale-95 shadow" title="Lưu thủ công ảnh này vào thư mục đích">
+                + Lưu
+              </button>
+            </div>
           `;
           candidatesGrid.appendChild(card);
           candidatesGrid.scrollTop = candidatesGrid.scrollHeight;
+          updateCandidateFilterCounts();
+          applyCandidateFilter();
         } else if (msg.type === 'candidate_evaluating') {
+          const cand = downloadCandidates.get(msg.id);
+          if (cand) cand.status = 'evaluating';
           const badge = document.getElementById(`cand-status-${msg.id}`);
           if (badge) {
-            badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-amber-500/30 text-amber-200 border border-amber-500/40 animate-pulse';
+            badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-amber-500/30 text-amber-200 border border-amber-500/40 animate-pulse pointer-events-none';
             badge.innerText = '🔍 Đang so khớp...';
           }
         } else if (msg.type === 'candidate_status') {
+          const cand = downloadCandidates.get(msg.id);
+          if (cand) {
+            cand.status = msg.status;
+            cand.sim = msg.sim;
+            cand.reason = msg.reason || '';
+          }
           const card = document.getElementById(`cand-card-${msg.id}`);
           const badge = document.getElementById(`cand-status-${msg.id}`);
+          const chkWrap = document.getElementById(`cand-chk-wrap-${msg.id}`);
+          const saveBtn = document.getElementById(`cand-save-btn-${msg.id}`);
+
           if (badge) {
             if (msg.status === 'accepted') {
               if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-emerald-950/20 border border-emerald-500/40 shadow-sm transition-all';
-              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-bold text-center truncate backdrop-blur-md bg-emerald-500/70 text-emerald-100 border border-emerald-500/80';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-bold text-center truncate backdrop-blur-md bg-emerald-500/70 text-emerald-100 border border-emerald-500/80 pointer-events-none';
               badge.innerText = `✅ Khớp (${msg.sim}%)`;
+              if (chkWrap) chkWrap.classList.add('hidden');
+              if (saveBtn) saveBtn.classList.add('hidden');
               if (msg.local_url) {
                 const imgEl = document.getElementById(`cand-img-${msg.id}`);
                 if (imgEl) imgEl.src = msg.local_url;
               }
             } else if (msg.status === 'rejected') {
-              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-rose-950/10 border border-rose-500/20 opacity-70 transition-all';
-              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-rose-500/30 text-rose-200 border border-rose-500/40';
+              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-rose-950/15 border border-rose-500/30 hover:border-rose-400/50 transition-all';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-rose-500/40 text-rose-200 border border-rose-500/50 pointer-events-none';
               badge.innerText = `⏭️ Khác (${msg.sim}%)`;
+              if (chkWrap) chkWrap.classList.remove('hidden');
+              if (saveBtn) saveBtn.classList.remove('hidden');
             } else if (msg.status === 'no_face') {
-              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-black/40 border border-white/[0.04] opacity-50 transition-all';
-              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10';
+              if (card) card.className = 'double-bezel p-1.5 rounded-xl flex flex-col space-y-1 relative group bg-black/50 border border-white/10 hover:border-white/20 transition-all';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10 pointer-events-none';
               badge.innerText = '⚪ Không có mặt';
+              if (chkWrap) chkWrap.classList.remove('hidden');
+              if (saveBtn) saveBtn.classList.remove('hidden');
             } else if (msg.status === 'error') {
-              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10';
+              badge.className = 'absolute bottom-1 inset-x-1 px-1 py-0.5 rounded text-[8px] font-mono font-semibold text-center truncate backdrop-blur-md bg-zinc-800 text-zinc-400 border border-white/10 pointer-events-none';
               badge.innerText = '⚠️ Lỗi tải';
+              if (chkWrap) chkWrap.classList.remove('hidden');
+              if (saveBtn) saveBtn.classList.remove('hidden');
             }
           }
+          updateCandidateFilterCounts();
+          applyCandidateFilter();
         } else if (msg.type === 'skipped') {
           document.getElementById('dl-stream-status').innerText = msg.message;
         } else if (msg.type === 'saved') {
@@ -1786,6 +2285,24 @@
         document.getElementById('label-det').innerText = cfg.det_thresh;
 
         document.getElementById('setting-strategy').value = cfg.multi_face_strategy || 'largest';
+
+        const sensEnableEl = document.getElementById('setting-sensitive-enable');
+        if (sensEnableEl) sensEnableEl.checked = cfg.enable_sensitive_check || false;
+
+        const sensModeEl = document.getElementById('setting-sensitive-mode');
+        if (sensModeEl) sensModeEl.value = cfg.sensitive_mode || 'rename';
+
+        const sensThreshEl = document.getElementById('setting-sensitive-thresh');
+        if (sensThreshEl) sensThreshEl.value = cfg.sensitive_threshold || 0.35;
+
+        const sensLabelEl = document.getElementById('label-sensitive-thresh');
+        if (sensLabelEl) sensLabelEl.innerText = cfg.sensitive_threshold || 0.35;
+
+        // Also sync Renamer tab selector if default enabled
+        const scanSensMode = document.getElementById('scan-sensitive-mode');
+        if (scanSensMode && cfg.enable_sensitive_check) {
+          scanSensMode.value = cfg.sensitive_mode || 'rename';
+        }
       } catch (err) {
         showToast('Lỗi tải cấu hình', 'error');
       }
@@ -1800,6 +2317,9 @@
         cosine_threshold: parseFloat(document.getElementById('setting-cosine').value),
         det_thresh: parseFloat(document.getElementById('setting-det').value),
         multi_face_strategy: document.getElementById('setting-strategy').value,
+        enable_sensitive_check: document.getElementById('setting-sensitive-enable').checked,
+        sensitive_mode: document.getElementById('setting-sensitive-mode').value,
+        sensitive_threshold: parseFloat(document.getElementById('setting-sensitive-thresh').value),
       };
 
       try {
@@ -1900,13 +2420,211 @@
     }
 
     // ==============================================================
-    // IMAGE PREVIEW LIGHTBOX MODAL CONTROLLER
+    // IMAGE PREVIEW LIGHTBOX MODAL CONTROLLER & BOUNDING BOXES
     // ==============================================================
     let currentPreviewList = [];
     let currentPreviewIdx = 0;
     let previewScale = 1.0;
+    let previewBoxesEnabled = true;
+    let currentPreviewData = null;
 
-    function openImagePreview(src, title = '', subtitle = '', list = [], idx = 0) {
+    function hexToRgba(hex, alpha = 0.22) {
+      if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(168, 85, 247, ${alpha})`;
+      let c = hex.substring(1);
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      const num = parseInt(c, 16);
+      return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+    }
+
+    function togglePreviewBoxes() {
+      previewBoxesEnabled = !previewBoxesEnabled;
+      const btnText = document.getElementById('preview-boxes-btn-text');
+      if (btnText) btnText.innerText = previewBoxesEnabled ? 'Khoanh vùng: BẬT' : 'Khoanh vùng: TẮT';
+      renderPreviewBoxes();
+    }
+
+    function handlePreviewImgLoaded() {
+      renderPreviewBoxes();
+    }
+
+    function openScanItemPreview(cardId) {
+      const r = window.scanItemsMap && window.scanItemsMap[cardId];
+      if (!r) return;
+      const currentOnDisk = r.current_name || r.original;
+      const badgeText = r.person || 'Unknown';
+      const previewDesc = `${badgeText}${r.is_sensitive ? ' | 🔞 ' + (r.sensitive_info?.max_category_vi || 'Nhạy cảm') + ' (' + (r.sensitive_info?.max_score || 0) + '%)' : ''}`;
+      openImagePreview(r.url, currentOnDisk, previewDesc, [{
+        src: r.url,
+        title: currentOnDisk,
+        subtitle: previewDesc,
+        bbox: r.bbox,
+        sensitive_info: r.sensitive_info,
+        person: r.person,
+        confidence: r.confidence,
+        status: r.status,
+        is_video: r.is_video,
+      }], 0);
+    }
+
+    function renderPreviewBoxes() {
+      const overlay = document.getElementById('preview-boxes-overlay');
+      const bar = document.getElementById('preview-detections-bar');
+      const toggleBtn = document.getElementById('preview-modal-toggle-boxes-btn');
+      const btnText = document.getElementById('preview-boxes-btn-text');
+      if (!overlay) return;
+      overlay.innerHTML = '';
+      if (bar) bar.innerHTML = '';
+
+      const item = (currentPreviewList && currentPreviewList[currentPreviewIdx]) || currentPreviewData;
+      if (!item) {
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        if (bar) bar.classList.add('hidden');
+        return;
+      }
+
+      const rawSrc = (item.src || '').toLowerCase();
+      const isVideo = rawSrc.includes('.mp4') || rawSrc.includes('.mov') || rawSrc.includes('.webm') || !!item.is_video;
+      if (isVideo) {
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        if (bar) bar.classList.add('hidden');
+        return;
+      }
+
+      const hasFace = !!(item.bbox && item.bbox.w > 0);
+      const sensitiveDets = (item.sensitive_info && Array.isArray(item.sensitive_info.detections)) ? item.sensitive_info.detections : [];
+      const hasSensitive = sensitiveDets.length > 0;
+
+      if (!hasFace && !hasSensitive) {
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        if (bar) bar.classList.add('hidden');
+        return;
+      }
+
+      if (toggleBtn) {
+        toggleBtn.classList.remove('hidden');
+        if (btnText) btnText.innerText = previewBoxesEnabled ? 'Khoanh vùng: BẬT' : 'Khoanh vùng: TẮT';
+        toggleBtn.className = previewBoxesEnabled
+          ? "px-2.5 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition shadow-lg mr-1 active:scale-95"
+          : "px-2.5 py-1.5 rounded-xl bg-white/5 text-zinc-400 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition mr-1 active:scale-95";
+      }
+
+      if (!previewBoxesEnabled) {
+        overlay.classList.add('hidden');
+        if (bar) bar.classList.add('hidden');
+        return;
+      }
+      overlay.classList.remove('hidden');
+
+      let chipsHtml = '';
+
+      // 1. Face Bounding Box
+      if (hasFace) {
+        const b = item.bbox;
+        const pName = item.person || 'Khuôn mặt';
+        const conf = item.confidence || b.score || 0;
+        const isUnk = (pName === 'unknown' || item.status === 'unknown');
+        const isLow = item.status === 'low_confidence';
+
+        const faceColor = isUnk ? '#f43f5e' : (isLow ? '#f59e0b' : '#06b6d4');
+        const faceBg = hexToRgba(faceColor, 0.22);
+        const faceLabel = `${pName} (${Number(conf).toFixed(1)}%)`;
+
+        const faceEl = document.createElement('div');
+        faceEl.id = 'box-face-main';
+        faceEl.className = 'absolute transition-all duration-150 pointer-events-auto cursor-pointer rounded';
+        faceEl.style.left = `${b.x * 100}%`;
+        faceEl.style.top = `${b.y * 100}%`;
+        faceEl.style.width = `${b.w * 100}%`;
+        faceEl.style.height = `${b.h * 100}%`;
+        faceEl.style.border = `2px solid ${faceColor}`;
+        faceEl.style.backgroundColor = faceBg;
+        faceEl.style.boxShadow = `0 0 14px ${faceColor}45`;
+        faceEl.title = `Khuôn mặt: ${faceLabel}`;
+
+        faceEl.innerHTML = `
+          <div class="absolute -top-6 left-0 px-2 py-0.5 rounded text-[11px] font-bold text-white shadow-md whitespace-nowrap pointer-events-none flex items-center gap-1 tracking-wide" style="background-color: ${faceColor};">
+            <span>👤</span>
+            <span>${faceLabel}</span>
+          </div>
+        `;
+        overlay.appendChild(faceEl);
+
+        chipsHtml += `
+          <span onclick="highlightPreviewBox('box-face-main')" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shadow-md border cursor-pointer hover:scale-105 active:scale-95 transition" style="background:${faceBg}; border-color:${faceColor}; color:${faceColor}">
+            <span>👤 ${faceLabel}</span>
+          </span>
+        `;
+      }
+
+      // 2. Sensitive / NSFW Bounding Boxes
+      sensitiveDets.forEach((d, dIdx) => {
+        const color = d.color || '#a855f7';
+        const fillBg = hexToRgba(color, 0.24);
+        const label = `${d.label_vi || d.class}: ${Number(d.score).toFixed(1)}%`;
+        const boxDomId = `box-sensitive-${dIdx}`;
+
+        let leftPct = 0, topPct = 0, widthPct = 0, heightPct = 0;
+        if (d.box_pct) {
+          leftPct = d.box_pct.x;
+          topPct = d.box_pct.y;
+          widthPct = d.box_pct.w;
+          heightPct = d.box_pct.h;
+        } else if (d.box && d.box.length >= 4) {
+          const img = document.getElementById('preview-modal-img');
+          const nw = (img && img.naturalWidth) ? img.naturalWidth : 1;
+          const nh = (img && img.naturalHeight) ? img.naturalHeight : 1;
+          leftPct = (d.box[0] / nw) * 100;
+          topPct = (d.box[1] / nh) * 100;
+          widthPct = (d.box[2] / nw) * 100;
+          heightPct = (d.box[3] / nh) * 100;
+        }
+
+        const boxEl = document.createElement('div');
+        boxEl.id = boxDomId;
+        boxEl.className = 'absolute transition-all duration-150 pointer-events-auto cursor-pointer rounded';
+        boxEl.style.left = `${leftPct}%`;
+        boxEl.style.top = `${topPct}%`;
+        boxEl.style.width = `${widthPct}%`;
+        boxEl.style.height = `${heightPct}%`;
+        boxEl.style.border = `2px solid ${color}`;
+        boxEl.style.backgroundColor = fillBg;
+        boxEl.style.boxShadow = `0 0 12px ${color}40`;
+        boxEl.title = label;
+
+        boxEl.innerHTML = `
+          <div class="absolute -top-6 left-0 px-2 py-0.5 rounded text-[11px] font-bold text-white shadow-md whitespace-nowrap pointer-events-none flex items-center gap-1 tracking-wide" style="background-color: ${color};">
+            <span>🔞</span>
+            <span>${label}</span>
+          </div>
+        `;
+        overlay.appendChild(boxEl);
+
+        chipsHtml += `
+          <span onclick="highlightPreviewBox('${boxDomId}')" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shadow-md border cursor-pointer hover:scale-105 active:scale-95 transition" style="background:${fillBg}; border-color:${color}; color:#fff">
+            <span>🔞 ${label}</span>
+          </span>
+        `;
+      });
+
+      if (bar && chipsHtml) {
+        bar.innerHTML = chipsHtml;
+        bar.classList.remove('hidden');
+      } else if (bar) {
+        bar.classList.add('hidden');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function highlightPreviewBox(boxId) {
+      const el = document.getElementById(boxId);
+      if (!el) return;
+      el.classList.add('ring-4', 'ring-white', 'scale-105');
+      setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-white', 'scale-105');
+      }, 700);
+    }
+
+    function openImagePreview(src, title = '', subtitle = '', list = [], idx = 0, extra = null) {
       if (!src) return;
       const modal = document.getElementById('image-preview-modal');
       const img = document.getElementById('preview-modal-img');
@@ -1921,11 +2639,12 @@
 
       currentPreviewList = (Array.isArray(list) && list.length > 0) ? list : [{ src, title, subtitle }];
       currentPreviewIdx = (idx >= 0 && idx < currentPreviewList.length) ? idx : 0;
-      previewScale = 1.0;
+      currentPreviewData = extra || currentPreviewList[currentPreviewIdx];
+      resetPreviewZoom();
 
       const item = currentPreviewList[currentPreviewIdx] || { src, title, subtitle };
       const rawSrc = item.src || src;
-      const isVideo = rawSrc.toLowerCase().includes('.mp4');
+      const isVideo = rawSrc.toLowerCase().includes('.mp4') || rawSrc.toLowerCase().includes('.mov') || rawSrc.toLowerCase().includes('.webm') || !!item.is_video;
 
       if (isVideo) {
         if (img) img.classList.add('hidden');
@@ -1943,7 +2662,6 @@
         if (img) {
           img.classList.remove('hidden');
           img.src = rawSrc;
-          img.style.transform = `scale(${previewScale})`;
         }
       }
 
@@ -1960,6 +2678,7 @@
       }
 
       modal.classList.remove('hidden');
+      renderPreviewBoxes();
       if (window.lucide) lucide.createIcons();
     }
 
@@ -1969,6 +2688,16 @@
         vid.pause();
         vid.src = '';
       }
+      const saveCandBtn = document.getElementById('preview-modal-save-cand-btn');
+      if (saveCandBtn) saveCandBtn.classList.add('hidden');
+      currentPreviewCandidateId = null;
+
+      resetPreviewZoom();
+      const overlay = document.getElementById('preview-boxes-overlay');
+      if (overlay) overlay.innerHTML = '';
+      const bar = document.getElementById('preview-detections-bar');
+      if (bar) bar.innerHTML = '';
+
       const modal = document.getElementById('image-preview-modal');
       if (modal) modal.classList.add('hidden');
     }
@@ -1981,14 +2710,14 @@
 
     function zoomPreview(delta) {
       previewScale = Math.min(3.0, Math.max(0.4, previewScale + delta));
-      const img = document.getElementById('preview-modal-img');
-      if (img) img.style.transform = `scale(${previewScale})`;
+      const stage = document.getElementById('preview-stage');
+      if (stage) stage.style.transform = `scale(${previewScale})`;
     }
 
     function resetPreviewZoom() {
       previewScale = 1.0;
-      const img = document.getElementById('preview-modal-img');
-      if (img) img.style.transform = `scale(1)`;
+      const stage = document.getElementById('preview-stage');
+      if (stage) stage.style.transform = `scale(1)`;
     }
 
     function nextImagePreview(e) {
@@ -2015,6 +2744,7 @@
       else if (e.key === 'ArrowLeft') prevImagePreview();
       else if (e.key === '+' || e.key === '=') zoomPreview(0.2);
       else if (e.key === '-') zoomPreview(-0.2);
+      else if (e.key === 'b' || e.key === 'B') togglePreviewBoxes();
     });
 
     // Init on Load
@@ -2038,6 +2768,18 @@
       
       <!-- Controls -->
       <div class="flex items-center gap-1.5 shrink-0">
+        <!-- Bounding Boxes Toggle Button -->
+        <button type="button" id="preview-modal-toggle-boxes-btn" onclick="togglePreviewBoxes()" class="hidden px-2.5 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition shadow-lg mr-1 active:scale-95" title="Bật/Tắt hiển thị khoanh vùng nhận diện (phím B)">
+          <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+          <span id="preview-boxes-btn-text">Khoanh vùng: BẬT</span>
+        </button>
+
+        <!-- Quick save button for failed candidates inside lightbox preview -->
+        <button type="button" id="preview-modal-save-cand-btn" onclick="saveCurrentPreviewCandidate()" class="hidden px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-lg mr-1.5 active:scale-95" title="Lưu thủ công ảnh này vào thư mục đích">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span id="preview-modal-save-cand-text">Lưu ảnh này</span>
+        </button>
+
         <button type="button" onclick="zoomPreview(0.2)" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition" title="Phóng to (+)">
           <i data-lucide="zoom-in" class="w-4 h-4"></i>
         </button>
@@ -2057,20 +2799,27 @@
     </div>
 
     <!-- Main Image Display with Navigation -->
-    <div class="relative w-full max-w-5xl flex-1 flex items-center justify-center overflow-hidden rounded-2xl bg-black/60 border border-white/[0.06] p-2">
+    <div class="relative w-full max-w-5xl flex-1 flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-black/60 border border-white/[0.06] p-2">
       <!-- Previous Button -->
-      <button id="preview-prev-btn" onclick="prevImagePreview(event)" class="absolute left-3 z-10 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh trước (←)">
+      <button id="preview-prev-btn" onclick="prevImagePreview(event)" class="absolute left-3 z-30 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh trước (←)">
         <i data-lucide="chevron-left" class="w-6 h-6"></i>
       </button>
 
-      <!-- Image & Video element -->
-      <div id="preview-img-container" class="w-full h-full flex items-center justify-center overflow-auto">
-        <img id="preview-modal-img" src="" alt="Preview" class="max-w-full max-h-[78vh] object-contain rounded-xl shadow-2xl transition-transform duration-150 select-none pointer-events-auto">
-        <video id="preview-modal-video" src="" controls class="hidden max-w-full max-h-[78vh] rounded-xl shadow-2xl bg-black"></video>
+      <!-- Image & Video Stage Container -->
+      <div id="preview-img-container" class="w-full flex-1 flex items-center justify-center overflow-auto p-1">
+        <div id="preview-stage" class="relative inline-block max-w-full max-h-[74vh] transition-transform duration-150 origin-center select-none">
+          <img id="preview-modal-img" src="" alt="Preview" class="max-w-full max-h-[74vh] w-auto h-auto block rounded-xl shadow-2xl object-contain pointer-events-auto" onload="handlePreviewImgLoaded()">
+          <!-- Bounding Boxes Overlay for Face and NSFW Sensitive detections -->
+          <div id="preview-boxes-overlay" class="absolute inset-0 pointer-events-none overflow-hidden rounded-xl"></div>
+          <video id="preview-modal-video" src="" controls class="hidden max-w-full max-h-[74vh] rounded-xl shadow-2xl bg-black pointer-events-auto"></video>
+        </div>
       </div>
 
+      <!-- Detection Tags / Chips bar at bottom of modal -->
+      <div id="preview-detections-bar" class="w-full max-w-3xl mt-1.5 flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 bg-[#0D1017]/90 backdrop-blur-md rounded-xl border border-white/10 hidden z-20"></div>
+
       <!-- Next Button -->
-      <button id="preview-next-btn" onclick="nextImagePreview(event)" class="absolute right-3 z-10 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh tiếp (→)">
+      <button id="preview-next-btn" onclick="nextImagePreview(event)" class="absolute right-3 z-30 p-3 rounded-2xl bg-black/70 hover:bg-black/95 border border-white/15 text-white transition hover:scale-105 shadow-2xl hidden" title="Ảnh tiếp (→)">
         <i data-lucide="chevron-right" class="w-6 h-6"></i>
       </button>
     </div>

@@ -3,9 +3,9 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Face Engine](https://img.shields.io/badge/engine-InsightFace%20(ArcFace%20buffalo__l)%20%7C%20dlib-purple.svg)](https://github.com/deepinsight/insightface)
 [![Web Framework](https://img.shields.io/badge/studio-FastAPI%20%2B%20TailwindCSS-emerald.svg)](https://fastapi.tiangolo.com/)
-[![Tests](https://img.shields.io/badge/tests-33%20passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-44%20passed%20(100%25)-brightgreen.svg)](tests/)
 
-A modern, high-performance face recognition and dataset management suite featuring **Face Recognition Studio (FastAPI Web GUI)**, an intelligent multi-platform face downloader, smart video/static photo analysis, automated DBSCAN clustering, and a modular CLI pipeline.
+A modern, high-performance face recognition and dataset management suite featuring **Face Recognition Studio (FastAPI Web GUI)**, an intelligent multi-platform face downloader, smart video/static photo analysis, NudeNet NSFW & sensitive content moderation, automated DBSCAN clustering, and a modular CLI pipeline.
 
 ---
 
@@ -14,7 +14,7 @@ A modern, high-performance face recognition and dataset management suite featuri
 ### 1. 🎨 Face Recognition Studio (Web GUI)
 - **Live Dark-Mode Interface**: Built with FastAPI, Tailwind CSS, and Lucide icons.
 - **Real-Time SSE Streaming**: Live progress bars, candidate stream previews, and detailed similarity scoring.
-- **Interactive Lightbox Viewer**: Seamlessly preview high-resolution photos and play verified `.mp4` video clips directly in the browser.
+- **Interactive Lightbox Viewer with Bounding Boxes**: Seamlessly preview high-resolution photos, toggle detection bounding box overlays (face + NSFW sensitive regions), and play verified `.mp4` video clips directly in the browser.
 - **Tabbed Operations**: Fast switching between **Thu Thập (Downloader)**, **Phân Loại (Classifier)**, and **Dataset Gallery**.
 
 ### 2. 🎯 Dual-Engine Recognition & ArcFace Embeddings
@@ -23,19 +23,36 @@ A modern, high-performance face recognition and dataset management suite featuri
 - **Smart Quality Filtering**: Automatically ignores tiny, blurry, or low-confidence face candidates.
 - **Multi-Face Resolution Strategies**: Supports `largest`, `highest_det_score`, `all`, or `skip` for images containing multiple people.
 
-### 3. 🌐 Multi-Source Intelligent Downloader
+### 3. 🔞 NudeNet NSFW & Sensitive Content Moderation
+- **Built-in ONNX Detection Model (`320n.onnx`)**: Fast, offline neural network inference without external API dependencies.
+- **Dual Processing Modes**:
+  - `rename`: Directly renames classified files with `sensitive_` prefix (e.g., `sensitive_sontung_IMG_0001.jpg`).
+  - `copy`: Keeps a clean original `sontung_IMG_0001.jpg` and produces a marked duplicate copy `sensitive_sontung_IMG_0001.jpg`.
+- **Shared Quarantine Directory (`dataset/sensitive/`)**: During `organize` (file relocation), all sensitive photos and videos are automatically gathered into a shared `dataset/sensitive/` folder directly, keeping person reference folders clean.
+- **Strictly Excluded from AI Models**: The `sensitive` directory is registered in `exclude_dirs`, ensuring quarantined files are never accidentally trained as facial reference embeddings.
+- **Preserved During Normalization (`clean`)**: The canonical numbering tool preserves `sensitive_` prefixes (`sensitive_<person>_<index>.<ext>`).
+
+### 4. 👁️ Interactive Bounding Box Overlays (Khoanh vùng nhận diện)
+- **Surgical HUD Reticles**: Live bounding boxes for recognized faces (Cyan `#06b6d4`), low-confidence matches (Amber `#f59e0b`), and unknown strangers (Rose `#f43f5e`).
+- **NudeNet Sensitive Regions**: Color-coded overlay boxes with Vietnamese labels and confidence percentages (e.g. `🔞 Ngực nữ (Bikini/Đồ lót): 89.2%`, `Vùng kín: 95.1%`).
+- **One-Click Toggle Button**: Easily show/hide all bounding boxes with the `[👁️ Khoanh vùng: BẬT/TẮT]` button or keyboard shortcut `B`.
+- **Interactive Detection Chips**: Tag list at the bottom of the lightbox modal; clicking any tag highlights that specific bounding box.
+- **Zoom-Synchronized Reticles**: Zooming (`+`/`-`) scales both the image and the bounding boxes simultaneously with pixel-perfect alignment.
+
+### 5. 🌐 Multi-Source Intelligent Downloader & Candidate Saver
 - **Bing Web Search**: Infinite pagination with same-person identity verification.
-- **Instagram Profiles**: Crawls profile avatars, high-resolution post photos, multi-image sidecars (carousels), and Reels.
-- **Instagram Highlights**: Fetches private/public story highlights using authenticated browser session cookies.
+- **Instagram Profiles & Highlights**: Crawls profile avatars, high-resolution post photos, multi-image sidecars (carousels), Reels, and story highlights using authenticated browser session cookies.
 - **Facebook Albums & Profiles**: Stream photos and profile pictures via graph scraper and authenticated browser cookies.
 - **Anchor Centroid Verification**: Dynamically updates an ArcFace anchor representation with a moving average to ensure all downloaded media belongs strictly to the targeted individual.
+- **Manual Failed Candidate Saving**: Inspect any rejected/borderline candidate in the lightbox preview and click **"Lưu ảnh này" (Save Candidate)** to manually override and save it directly into the dataset.
 
-### 4. 🎬 Smart Video Analysis & Static Photo Detection
-- **In-Memory Frame Sampling**: Extracts frames at regular time intervals without disk bloat, verifying face identity against the anchor centroid.
+### 6. 🎬 Smart Video Face Recognition & Static Photo Detection
+- **Video Face Recognition (Majority Voting)**: Extracts sample frames, computes embeddings with motion-blur adjusted thresholds (`min(det_thresh, 0.42)`), and votes on candidate identities across both CLI and Web Studio (`/api/scan`, `/api/scan/stream`, `/api/playground`).
+- **Resilient Video Frame Decoding**: Sequential fallback ensures reliable frame extraction even for streaming, web, or variable frame-rate MP4s where `total_frames <= 0`.
 - **Single-Photo Video Optimization**: Intelligently identifies videos that only display a single static photo (e.g. still pictures with background audio, lyrics, or subtle zoom) using 3-tier motion analysis (Mean Absolute Difference + $8 \times 8$ grid block variance + facial landmark consistency). Skips saving heavy `.mp4` files and extracts 1 crisp `.jpg` frame.
-- **Direct Video Stream Processing**: Supports direct CDN links, Reels, Shorts, and `.mp4` URLs.
+- **Video Sensitive Checking**: Samples video frames and detects sensitive content in clips.
 
-### 5. 🤖 Automated Pipeline & Dataset Curation
+### 7. 🤖 Automated Pipeline & Dataset Curation
 - **DBSCAN Auto-Clustering**: Automatically groups unidentified faces of new recurring individuals.
 - **Interactive Registration**: Prompts for real human names and moves files into organized subdirectories.
 - **Dataset File Normalization**: Formats files into canonical names: `<person_name>_<index>.<ext>`.
@@ -57,16 +74,18 @@ face-recognition-classifier/
 │   ├── io.py                      # Safe file IO, renaming, moving & normalization
 │   ├── matcher.py                 # Cosine similarity matcher & DBSCAN clustering
 │   ├── pipeline.py                # End-to-end classification & organization pipelines
+│   ├── sensitive.py               # NudeNet NSFW & sensitive content detector
 │   ├── server.py                  # FastAPI server with SSE streaming endpoints
 │   ├── templates/
 │   │   └── index.html             # Studio Web GUI application
 │   └── video.py                   # Video stream extraction & static motion analysis
-├── tests/                         # Pytest Suite (33 tests)
+├── tests/                         # Pytest Suite (44 tests)
 │   ├── test_cache.py              # Cache persistence and invalidation tests
 │   ├── test_config.py             # Config loading and validation tests
 │   ├── test_io.py                 # Safe rename, move, and filename builder tests
 │   ├── test_matcher.py            # Matching and clustering tests
-│   ├── test_server.py             # FastAPI API endpoint tests
+│   ├── test_sensitive.py          # NudeNet, sensitive naming, organize & clean tests
+│   ├── test_server.py             # FastAPI API endpoint & video tests
 │   └── test_video.py              # Video URL, sampling, and static video detection tests
 ├── config.yaml                    # Global configuration file
 ├── download_faces.py              # Standalone Downloader CLI
@@ -80,6 +99,7 @@ face-recognition-classifier/
 └── dataset/                       # Dataset directory (ignored by git)
     ├── person_a/                  # Reference photos for Person A
     ├── person_b/                  # Reference photos for Person B
+    ├── sensitive/                 # Quarantined NSFW / sensitive media (shared)
     └── chua_phan_loai/            # Unclassified input images & videos
 ```
 
@@ -132,6 +152,12 @@ The runner script `run.sh` provides shorthands for single tasks, chained pipelin
 # Execute face recognition renaming
 ./run.sh -ra
 
+# Rename with NSFW sensitive detection in 'rename' mode
+python -m facecls rename --apply --sensitive-mode rename --sensitive-thresh 0.35
+
+# Rename with NSFW sensitive detection in 'copy' mode (keeps clean + duplicate sensitive)
+python -m facecls rename --apply --sensitive-mode copy --sensitive-thresh 0.35
+
 # Auto-cluster unknown faces in chua_phan_loai
 ./run.sh -c
 
@@ -156,8 +182,10 @@ The runner script `run.sh` provides shorthands for single tasks, chained pipelin
 | `--download` | `--download <query>` | Collect face images from Web / Instagram / Facebook |
 | `-a` | `--apply` | Execute mutative changes (rename, move, create directories) |
 | `-r` | `--rename` | Match and rename unclassified images against known persons |
+| `--sensitive-mode` | `--sensitive-mode <none\|rename\|copy>` | NSFW detection mode (`rename` or duplicate `copy`) |
+| `--sensitive-thresh` | `--sensitive-thresh <float>` | NudeNet confidence score threshold (default: 0.35) |
 | `-c` | `--cluster` | Auto-cluster unknown faces using DBSCAN |
-| `-o` / `-m` | `--organize` | Move classified files into dedicated person folders |
+| `-o` / `-m` | `--organize` | Move classified files into dedicated person folders & `dataset/sensitive/` |
 | `-n` | `--clean` / `--norm` | Standardize dataset filenames to `<person>_<index>.<ext>` |
 | `-y` | `--yes` | Non-interactive auto-confirmation for prompts |
 | `-p` | `--prepare-test` | Sample test images from person folders into unclassified dir |
@@ -172,6 +200,15 @@ The runner script `run.sh` provides shorthands for single tasks, chained pipelin
 dataset_root: "./dataset"
 unclassified_dir: "chua_phan_loai"
 cache_file: ".face_encodings_cache.pkl"
+
+# Folders completely excluded from face recognition models & training
+exclude_dirs:
+  - "chua_phan_loai"
+  - "khac"
+  - "other"
+  - "sensitive"        # Quarantined NSFW media (never trained)
+  - "GV"
+  - "DD"
 
 # Embedding engine: insightface (recommended) or face_recognition (dlib)
 engine: "insightface"
@@ -193,6 +230,12 @@ max_images_per_person: 50
 
 # Confidence threshold (%) to trigger low_ prefix
 low_confidence_threshold: 70
+
+# NudeNet NSFW & Sensitive Content Moderation
+enable_sensitive_check: false
+sensitive_mode: "rename"       # "rename" or "copy"
+sensitive_threshold: 0.35      # 0.0 - 1.0; recommended: 0.35
+sensitive_prefix: "sensitive"
 ```
 
 ---
@@ -205,7 +248,7 @@ Run the automated test suite with `pytest`:
 PYTHONPATH=. .venv/bin/pytest tests/
 ```
 
-All 33 test cases verify cache persistence, configuration loading, IO safety, face matching, REST/SSE endpoints, and video motion analysis.
+All 44 test cases verify cache persistence, configuration loading, IO safety, face matching, REST/SSE endpoints, NudeNet sensitive checks, lightbox reticles, video recognition, and video motion analysis.
 
 ---
 

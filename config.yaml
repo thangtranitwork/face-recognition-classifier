@@ -16,6 +16,7 @@ exclude_dirs:
   - "chua_phan_loai"   # Thư mục cần xử lý
   - "khac"             # Người khác / không rõ danh tính
   - "other"            # Ảnh không phân loại theo người
+  - "sensitive"        # Thư mục chứa ảnh/video nhạy cảm đã phân loại
   - "GV"
   - "DD"
   - "N"
@@ -115,6 +116,23 @@ low_confidence_format: "low_{person}_{original}"
 
 # Tiền tố cho ảnh không nhận diện được hoặc không có khuôn mặt
 unknown_prefix: "unknown"
+
+# ============================================================
+# Kiểm duyệt nội dung nhạy cảm (NudeNet NSFW)
+# ============================================================
+# Bật kiểm tra nội dung nhạy cảm khi nhận diện
+enable_sensitive_check: false
+
+# Chế độ xử lý khi phát hiện ảnh nhạy cảm:
+#   "rename" - Đổi tên trực tiếp với tiền tố (ví dụ: sensitive_sontung_01.jpg)
+#   "copy"   - Đổi tên bình thường và tạo thêm 1 bản sao đánh dấu sensitive
+sensitive_mode: "rename"
+
+# Ngưỡng phát hiện NudeNet (0.0 - 1.0; khuyên dùng 0.35)
+sensitive_threshold: 0.35
+
+# Tiền tố đánh dấu ảnh nhạy cảm
+sensitive_prefix: "sensitive"
 
 # ============================================================
 # Bộ nhớ đệm (Cache)

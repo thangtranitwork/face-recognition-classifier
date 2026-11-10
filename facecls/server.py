@@ -9,11 +9,15 @@ import time
 import base64
 import tempfile
 import shutil
+import logging
+from io import BytesIO
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Set
 import numpy as np
 import cv2
 from PIL import Image
+
+logger = logging.getLogger("face_server")
 
 import urllib.request
 import urllib.parse
@@ -27,6 +31,7 @@ from facecls.config import load_config, AppConfig
 from facecls.io import (
     ALL_VALID_EXTENSIONS,
     VALID_IMAGE_EXTENSIONS,
+    VALID_VIDEO_EXTENSIONS,
     resolve_target_dir,
     safe_rename,
     safe_move,
@@ -38,6 +43,7 @@ from facecls.io import (
 from facecls.cache import EmbeddingCache
 from facecls.engine import FaceEngine
 from facecls.matcher import KnownFaceIndex
+from facecls.sensitive import check_sensitive, check_sensitive_media
 from facecls.pipeline import load_known_faces, run_organize, run_clean, run_prepare
 from facecls.downloader import (
     search_image_urls_page,
@@ -172,6 +178,8 @@ async def get_stats():
     cfg = load_config()
     dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
 
     person_dirs = [
         d for d in dataset_root.iterdir()
@@ -215,6 +223,8 @@ async def list_persons():
     cfg = load_config()
     dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
 
     person_dirs = sorted([
         d for d in dataset_root.iterdir()
@@ -353,6 +363,24 @@ async def scan_unclassified(payload: Dict[str, Any] = {}):
     dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
     unclassified_dir = dataset_root / cfg.unclassified_dir
 
+    # Xác định chế độ kiểm duyệt nhạy cảm NudeNet
+    sensitive_mode_param = payload.get("sensitive_mode")
+    sensitive_thresh_param = payload.get("sensitive_threshold")
+    if sensitive_mode_param is not None and str(sensitive_mode_param).strip().lower() != "none":
+        active_sensitive_mode = str(sensitive_mode_param).strip().lower()
+    elif sensitive_mode_param == "none":
+        active_sensitive_mode = "none"
+    else:
+        active_sensitive_mode = cfg.sensitive_mode if cfg.enable_sensitive_check else "none"
+
+    if sensitive_thresh_param is not None:
+        try:
+            active_sensitive_thresh = float(sensitive_thresh_param)
+        except (ValueError, TypeError):
+            active_sensitive_thresh = cfg.sensitive_threshold
+    else:
+        active_sensitive_thresh = cfg.sensitive_threshold
+
     engine_obj = get_shared_engine()
     cache = get_shared_cache()
 
@@ -369,6 +397,8 @@ async def scan_unclassified(payload: Dict[str, Any] = {}):
         "unknown": 0,
         "skipped": 0,
         "renamed": 0,
+        "sensitive": 0,
+        "sensitive_copies": 0,
         "error": 0,
         "total": len(media_files),
     }
@@ -380,13 +410,16 @@ async def scan_unclassified(payload: Dict[str, Any] = {}):
 
     for fpath in media_files:
         orig_name = fpath.name
-        rel = fpath.relative_to(PROJECT_ROOT)
+        try:
+            rel = fpath.relative_to(PROJECT_ROOT)
+        except ValueError:
+            rel = fpath.name
         media_url = f"/api/media/{rel}?t={now_ts}"
 
         is_already = is_already_processed(orig_name, known_names, cfg.unknown_prefix)
 
-        # Nếu file đã đổi tên trước đó và không yêu cầu quét cưỡng bức, bỏ qua bước inference ONNX nặng
-        if is_already and not force and not apply:
+        # Nếu file đã đổi tên trước đó và không yêu cầu quét cưỡng bức
+        if is_already and not force and not apply and active_sensitive_mode not in ("rename", "copy"):
             stats["skipped"] += 1
             predicted_p = orig_name.split("_")[0]
             results.append({
@@ -399,185 +432,45 @@ async def scan_unclassified(payload: Dict[str, Any] = {}):
                 "reason": f"Đã được gắn nhãn '{predicted_p}'",
                 "status": "already_named",
                 "bbox": None,
+                "is_sensitive": False,
+                "sensitive_info": None,
+                "sensitive_mode": "none",
+                "sensitive_copy_name": None,
+                "sensitive_copy_url": None,
             })
             continue
 
-        # Trích xuất bounding box và vector đặc trưng (để trực quan hóa trên giao diện)
-        img_rgb = load_image_rgb(fpath, max_size=cfg.image_max_size)
+        ext = fpath.suffix.lower()
+        is_video = ext in VALID_VIDEO_EXTENSIONS
         bbox = None
         face_enc = None
+        video_frames = None
 
-        if img_rgb is not None:
-            h, w, _ = img_rgb.shape
-            faces = engine_obj.app.get(img_rgb[:, :, ::-1]) if engine_obj.engine == "insightface" else []
-            if faces:
-                best_face = max(faces, key=lambda f: float((f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])))
-                b = best_face.bbox
-                bbox = {
-                    "x": float(b[0] / w),
-                    "y": float(b[1] / h),
-                    "w": float((b[2] - b[0]) / w),
-                    "h": float((b[3] - b[1]) / h),
-                    "score": round(float(best_face.det_score) * 100, 1),
-                }
-                emb = best_face.embedding
-                norm = np.linalg.norm(emb)
-                if norm > 0:
-                    face_enc = (emb / norm).astype(np.float32)
-
-        if is_already and not apply:
-            stats["skipped"] += 1
-            predicted_p = orig_name.split("_")[0]
-            conf = 100.0
-            if face_enc is not None:
-                _, _, c_val = index.match_single(face_enc, top_k=cfg.top_k_neighbors)
-                conf = c_val
-
-            results.append({
-                "original": orig_name,
-                "current_name": orig_name,
-                "new_name": orig_name,
-                "url": media_url,
-                "person": predicted_p,
-                "confidence": conf,
-                "reason": f"Đã được gắn nhãn '{predicted_p}'",
-                "status": "already_named",
-                "bbox": bbox,
-            })
-            continue
-
-        if face_enc is None:
-            person = cfg.unknown_prefix
-            reason = "Không phát hiện khuôn mặt"
-            conf = 0.0
-        else:
-            person, reason, conf = index.match_single(
-                face_enc=face_enc,
-                top_k=cfg.top_k_neighbors,
-                threshold=cfg.cosine_threshold,
-                margin_threshold=cfg.margin_threshold,
-                unknown_prefix=cfg.unknown_prefix,
+        if is_video:
+            video_frames = engine_obj.extract_frames_from_video(
+                fpath, sample_frames=cfg.sample_frames_per_video
             )
-
-        is_unknown = (person == cfg.unknown_prefix)
-        is_low = (not is_unknown and conf < cfg.low_confidence_threshold)
-
-        if is_unknown:
-            stats["unknown"] += 1
-            status = "unknown"
-            fmt = cfg.name_format
-        elif is_low:
-            stats["low_confidence"] += 1
-            status = "low_confidence"
-            fmt = cfg.low_confidence_format
+            if not video_frames:
+                person = cfg.unknown_prefix
+                reason = "Video không đọc được khung hình nào"
+                conf = 0.0
+            elif index is None:
+                person = cfg.unknown_prefix
+                reason = "Chưa có dữ liệu khuôn mặt mẫu"
+                conf = 0.0
+            else:
+                person, reason, conf, bbox = index.match_video(
+                    frames=video_frames,
+                    engine_obj=engine_obj,
+                    top_k=cfg.top_k_neighbors,
+                    threshold=cfg.cosine_threshold if cfg.engine == "insightface" else cfg.tolerance,
+                    margin_threshold=cfg.margin_threshold,
+                    unknown_prefix=cfg.unknown_prefix,
+                    return_bbox=True,
+                )
         else:
-            stats["recognized"] += 1
-            status = "recognized"
-            fmt = cfg.name_format
-
-        new_name = build_new_name(person, orig_name, fmt)
-        current_display_name = orig_name
-
-        if apply:
-            try:
-                new_path = safe_rename(fpath, new_name)
-                current_display_name = new_path.name
-                new_name = new_path.name
-                media_url = f"/api/media/{new_path.relative_to(PROJECT_ROOT)}?t={now_ts}"
-                status = "renamed_now"
-                stats["renamed"] += 1
-            except Exception as e:
-                stats["error"] += 1
-
-        results.append({
-            "original": orig_name,
-            "current_name": current_display_name,
-            "new_name": new_name,
-            "url": media_url,
-            "person": person,
-            "confidence": conf,
-            "reason": reason,
-            "status": status,
-            "bbox": bbox,
-        })
-
-    return {"stats": stats, "results": results, "applied": apply}
-
-
-@app.get("/api/scan/stream")
-async def scan_stream(
-    request: Request,
-    apply: bool = Query(False),
-    force: bool = Query(False),
-):
-    """
-    Quét và nhận diện khuôn mặt thời gian thực theo từng tệp (SSE stream).
-    Cho phép giao diện hiển thị ngay từng ảnh được phân tích mà không cần chờ đợi.
-    """
-    async def event_generator():
-        cfg = load_config()
-        dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
-        unclassified_dir = dataset_root / cfg.unclassified_dir
-
-        engine_obj = get_shared_engine()
-        cache = get_shared_cache()
-
-        known_faces, index = load_known_faces(cfg, engine_obj, cache, dataset_root, unclassified_dir)
-
-        media_files = sorted([
-            f for f in unclassified_dir.iterdir()
-            if f.is_file() and f.suffix.lower() in ALL_VALID_EXTENSIONS
-        ], key=lambda f: f.name.lower())
-
-        stats = {
-            "recognized": 0,
-            "low_confidence": 0,
-            "unknown": 0,
-            "skipped": 0,
-            "renamed": 0,
-            "error": 0,
-            "total": len(media_files),
-        }
-        known_names = set(known_faces.keys())
-        now_ts = int(time.time() * 1000)
-
-        yield f"data: {json.dumps({'type': 'start', 'total': len(media_files), 'apply': apply})}\n\n"
-        await asyncio.sleep(0.02)
-
-        for i, fpath in enumerate(media_files, start=1):
-            if await request.is_disconnected() or "scan" in ACTIVE_CANCELLATIONS:
-                ACTIVE_CANCELLATIONS.discard("scan")
-                yield f"data: {json.dumps({'type': 'cancelled', 'message': 'Đã dừng quét theo yêu cầu', 'stats': stats})}\n\n"
-                break
-
-            orig_name = fpath.name
-            rel = fpath.relative_to(PROJECT_ROOT)
-            media_url = f"/api/media/{rel}?t={now_ts}"
-            is_already = is_already_processed(orig_name, known_names, cfg.unknown_prefix)
-
-            # Nếu file đã đổi tên trước đó và không quét cưỡng bức, bỏ qua ONNX inference
-            if is_already and not force and not apply:
-                stats["skipped"] += 1
-                predicted_p = orig_name.split("_")[0]
-                item_data = {
-                    "original": orig_name,
-                    "current_name": orig_name,
-                    "new_name": orig_name,
-                    "url": media_url,
-                    "person": predicted_p,
-                    "confidence": 100.0,
-                    "reason": f"Đã được gắn nhãn '{predicted_p}'",
-                    "status": "already_named",
-                    "bbox": None,
-                }
-                yield f"data: {json.dumps({'type': 'item', 'index': i, 'total': len(media_files), 'stats': stats, 'item': item_data})}\n\n"
-                await asyncio.sleep(0.01)
-                continue
-
-            # Trích xuất bounding box và vector đặc trưng
+            # Trích xuất bounding box và vector đặc trưng (để trực quan hóa trên giao diện)
             img_rgb = load_image_rgb(fpath, max_size=cfg.image_max_size)
-            bbox = None
-            face_enc = None
 
             if img_rgb is not None:
                 h, w, _ = img_rgb.shape
@@ -597,15 +490,15 @@ async def scan_stream(
                     if norm > 0:
                         face_enc = (emb / norm).astype(np.float32)
 
-            if is_already and not apply:
+            if is_already and not apply and active_sensitive_mode not in ("rename", "copy"):
                 stats["skipped"] += 1
                 predicted_p = orig_name.split("_")[0]
                 conf = 100.0
-                if face_enc is not None:
+                if face_enc is not None and index is not None:
                     _, _, c_val = index.match_single(face_enc, top_k=cfg.top_k_neighbors)
                     conf = c_val
 
-                item_data = {
+                results.append({
                     "original": orig_name,
                     "current_name": orig_name,
                     "new_name": orig_name,
@@ -615,14 +508,22 @@ async def scan_stream(
                     "reason": f"Đã được gắn nhãn '{predicted_p}'",
                     "status": "already_named",
                     "bbox": bbox,
-                }
-                yield f"data: {json.dumps({'type': 'item', 'index': i, 'total': len(media_files), 'stats': stats, 'item': item_data})}\n\n"
-                await asyncio.sleep(0.01)
+                    "is_sensitive": False,
+                    "sensitive_info": None,
+                    "sensitive_mode": "none",
+                    "sensitive_copy_name": None,
+                    "sensitive_copy_url": None,
+                    "is_video": is_video,
+                })
                 continue
 
             if face_enc is None:
                 person = cfg.unknown_prefix
                 reason = "Không phát hiện khuôn mặt"
+                conf = 0.0
+            elif index is None:
+                person = cfg.unknown_prefix
+                reason = "Chưa có dữ liệu khuôn mặt mẫu"
                 conf = 0.0
             else:
                 person, reason, conf = index.match_single(
@@ -632,6 +533,277 @@ async def scan_stream(
                     margin_threshold=cfg.margin_threshold,
                     unknown_prefix=cfg.unknown_prefix,
                 )
+
+        is_unknown = (person == cfg.unknown_prefix)
+        is_low = (not is_unknown and conf < cfg.low_confidence_threshold)
+
+        if is_unknown:
+            stats["unknown"] += 1
+            status = "unknown"
+            fmt = cfg.name_format
+        elif is_low:
+            stats["low_confidence"] += 1
+            status = "low_confidence"
+            fmt = cfg.low_confidence_format
+        else:
+            stats["recognized"] += 1
+            status = "recognized"
+            fmt = cfg.name_format
+
+        # Kiểm tra nội dung nhạy cảm NudeNet
+        is_sensitive = False
+        sens_info = None
+        sensitive_copy_name = None
+        sensitive_copy_url = None
+
+        if active_sensitive_mode in ("rename", "copy"):
+            if is_video:
+                sens_info = check_sensitive_media(fpath, frames=video_frames, threshold=active_sensitive_thresh)
+            else:
+                sens_info = check_sensitive(fpath, threshold=active_sensitive_thresh)
+            is_sensitive = sens_info.get("is_sensitive", False)
+            if is_sensitive:
+                stats["sensitive"] = stats.get("sensitive", 0) + 1
+
+        if is_sensitive and active_sensitive_mode == "rename":
+            new_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+        else:
+            new_name = build_new_name(person, orig_name, fmt, is_sensitive=False)
+
+        if is_sensitive and active_sensitive_mode == "copy":
+            sensitive_copy_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+
+        current_display_name = orig_name
+
+        if apply:
+            try:
+                new_path = safe_rename(fpath, new_name)
+                current_display_name = new_path.name
+                new_name = new_path.name
+                media_url = f"/api/media/{new_path.relative_to(PROJECT_ROOT)}?t={now_ts}"
+                status = "renamed_now"
+                stats["renamed"] += 1
+
+                if is_sensitive and active_sensitive_mode == "copy" and sensitive_copy_name:
+                    copy_dest = generate_unique_path(new_path.parent, sensitive_copy_name)
+                    shutil.copy2(str(new_path), str(copy_dest))
+                    sensitive_copy_name = copy_dest.name
+                    sensitive_copy_url = f"/api/media/{copy_dest.relative_to(PROJECT_ROOT)}?t={now_ts}"
+                    stats["sensitive_copies"] = stats.get("sensitive_copies", 0) + 1
+            except Exception as e:
+                logger.error(f"Lỗi khi đổi tên/sao chép tệp {orig_name}: {e}")
+                stats["error"] += 1
+
+        results.append({
+            "original": orig_name,
+            "current_name": current_display_name,
+            "new_name": new_name,
+            "url": media_url,
+            "person": person,
+            "confidence": conf,
+            "reason": reason,
+            "status": status,
+            "bbox": bbox,
+            "is_sensitive": is_sensitive,
+            "sensitive_info": sens_info if is_sensitive else None,
+            "sensitive_mode": active_sensitive_mode if is_sensitive else "none",
+            "sensitive_copy_name": sensitive_copy_name,
+            "sensitive_copy_url": sensitive_copy_url,
+            "is_video": is_video,
+        })
+
+    return {"stats": stats, "results": results, "applied": apply}
+
+
+@app.get("/api/scan/stream")
+async def scan_stream(
+    request: Request,
+    apply: bool = Query(False),
+    force: bool = Query(False),
+    sensitive_mode: Optional[str] = Query(None),
+    sensitive_thresh: Optional[float] = Query(None),
+):
+    """
+    Quét và nhận diện khuôn mặt thời gian thực theo từng tệp (SSE stream).
+    Cho phép giao diện hiển thị ngay từng ảnh được phân tích mà không cần chờ đợi.
+    """
+    async def event_generator():
+        cfg = load_config()
+        dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
+        unclassified_dir = dataset_root / cfg.unclassified_dir
+
+        if sensitive_mode is not None and str(sensitive_mode).strip().lower() != "none":
+            active_sensitive_mode = str(sensitive_mode).strip().lower()
+        elif sensitive_mode == "none":
+            active_sensitive_mode = "none"
+        else:
+            active_sensitive_mode = cfg.sensitive_mode if cfg.enable_sensitive_check else "none"
+
+        if sensitive_thresh is not None:
+            active_sensitive_thresh = float(sensitive_thresh)
+        else:
+            active_sensitive_thresh = cfg.sensitive_threshold
+
+        engine_obj = get_shared_engine()
+        cache = get_shared_cache()
+
+        known_faces, index = load_known_faces(cfg, engine_obj, cache, dataset_root, unclassified_dir)
+
+        media_files = sorted([
+            f for f in unclassified_dir.iterdir()
+            if f.is_file() and f.suffix.lower() in ALL_VALID_EXTENSIONS
+        ], key=lambda f: f.name.lower())
+
+        stats = {
+            "recognized": 0,
+            "low_confidence": 0,
+            "unknown": 0,
+            "skipped": 0,
+            "renamed": 0,
+            "sensitive": 0,
+            "sensitive_copies": 0,
+            "error": 0,
+            "total": len(media_files),
+        }
+        known_names = set(known_faces.keys())
+        now_ts = int(time.time() * 1000)
+
+        yield f"data: {json.dumps({'type': 'start', 'total': len(media_files), 'apply': apply, 'sensitive_mode': active_sensitive_mode})}\n\n"
+        await asyncio.sleep(0.02)
+
+        for i, fpath in enumerate(media_files, start=1):
+            if await request.is_disconnected() or "scan" in ACTIVE_CANCELLATIONS:
+                ACTIVE_CANCELLATIONS.discard("scan")
+                yield f"data: {json.dumps({'type': 'cancelled', 'message': 'Đã dừng quét theo yêu cầu', 'stats': stats})}\n\n"
+                break
+
+            orig_name = fpath.name
+            try:
+                rel = fpath.relative_to(PROJECT_ROOT)
+            except ValueError:
+                rel = fpath.name
+            media_url = f"/api/media/{rel}?t={now_ts}"
+            is_already = is_already_processed(orig_name, known_names, cfg.unknown_prefix)
+
+            # Nếu file đã đổi tên trước đó và không quét cưỡng bức
+            if is_already and not force and not apply and active_sensitive_mode not in ("rename", "copy"):
+                stats["skipped"] += 1
+                predicted_p = orig_name.split("_")[0]
+                item_data = {
+                    "original": orig_name,
+                    "current_name": orig_name,
+                    "new_name": orig_name,
+                    "url": media_url,
+                    "person": predicted_p,
+                    "confidence": 100.0,
+                    "reason": f"Đã được gắn nhãn '{predicted_p}'",
+                    "status": "already_named",
+                    "bbox": None,
+                    "is_sensitive": False,
+                    "sensitive_info": None,
+                    "sensitive_mode": "none",
+                    "sensitive_copy_name": None,
+                    "sensitive_copy_url": None,
+                }
+                yield f"data: {json.dumps({'type': 'item', 'index': i, 'total': len(media_files), 'stats': stats, 'item': item_data})}\n\n"
+                await asyncio.sleep(0.01)
+                continue
+
+            ext = fpath.suffix.lower()
+            is_video = ext in VALID_VIDEO_EXTENSIONS
+            bbox = None
+            face_enc = None
+            video_frames = None
+
+            if is_video:
+                video_frames = engine_obj.extract_frames_from_video(
+                    fpath, sample_frames=cfg.sample_frames_per_video
+                )
+                if not video_frames:
+                    person = cfg.unknown_prefix
+                    reason = "Video không đọc được khung hình nào"
+                    conf = 0.0
+                elif index is None:
+                    person = cfg.unknown_prefix
+                    reason = "Chưa có dữ liệu khuôn mặt mẫu"
+                    conf = 0.0
+                else:
+                    person, reason, conf, bbox = index.match_video(
+                        frames=video_frames,
+                        engine_obj=engine_obj,
+                        top_k=cfg.top_k_neighbors,
+                        threshold=cfg.cosine_threshold if cfg.engine == "insightface" else cfg.tolerance,
+                        margin_threshold=cfg.margin_threshold,
+                        unknown_prefix=cfg.unknown_prefix,
+                        return_bbox=True,
+                    )
+            else:
+                # Trích xuất bounding box và vector đặc trưng
+                img_rgb = load_image_rgb(fpath, max_size=cfg.image_max_size)
+
+                if img_rgb is not None:
+                    h, w, _ = img_rgb.shape
+                    faces = engine_obj.app.get(img_rgb[:, :, ::-1]) if engine_obj.engine == "insightface" else []
+                    if faces:
+                        best_face = max(faces, key=lambda f: float((f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])))
+                        b = best_face.bbox
+                        bbox = {
+                            "x": float(b[0] / w),
+                            "y": float(b[1] / h),
+                            "w": float((b[2] - b[0]) / w),
+                            "h": float((b[3] - b[1]) / h),
+                            "score": round(float(best_face.det_score) * 100, 1),
+                        }
+                        emb = best_face.embedding
+                        norm = np.linalg.norm(emb)
+                        if norm > 0:
+                            face_enc = (emb / norm).astype(np.float32)
+
+                if is_already and not apply and active_sensitive_mode not in ("rename", "copy"):
+                    stats["skipped"] += 1
+                    predicted_p = orig_name.split("_")[0]
+                    conf = 100.0
+                    if face_enc is not None and index is not None:
+                        _, _, c_val = index.match_single(face_enc, top_k=cfg.top_k_neighbors)
+                        conf = c_val
+
+                    item_data = {
+                        "original": orig_name,
+                        "current_name": orig_name,
+                        "new_name": orig_name,
+                        "url": media_url,
+                        "person": predicted_p,
+                        "confidence": conf,
+                        "reason": f"Đã được gắn nhãn '{predicted_p}'",
+                        "status": "already_named",
+                        "bbox": bbox,
+                        "is_sensitive": False,
+                        "sensitive_info": None,
+                        "sensitive_mode": "none",
+                        "sensitive_copy_name": None,
+                        "sensitive_copy_url": None,
+                        "is_video": is_video,
+                    }
+                    yield f"data: {json.dumps({'type': 'item', 'index': i, 'total': len(media_files), 'stats': stats, 'item': item_data})}\n\n"
+                    await asyncio.sleep(0.01)
+                    continue
+
+                if face_enc is None:
+                    person = cfg.unknown_prefix
+                    reason = "Không phát hiện khuôn mặt"
+                    conf = 0.0
+                elif index is None:
+                    person = cfg.unknown_prefix
+                    reason = "Chưa có dữ liệu khuôn mặt mẫu"
+                    conf = 0.0
+                else:
+                    person, reason, conf = index.match_single(
+                        face_enc=face_enc,
+                        top_k=cfg.top_k_neighbors,
+                        threshold=cfg.cosine_threshold,
+                        margin_threshold=cfg.margin_threshold,
+                        unknown_prefix=cfg.unknown_prefix,
+                    )
 
             is_unknown = (person == cfg.unknown_prefix)
             is_low = (not is_unknown and conf < cfg.low_confidence_threshold)
@@ -649,7 +821,29 @@ async def scan_stream(
                 status = "recognized"
                 fmt = cfg.name_format
 
-            new_name = build_new_name(person, orig_name, fmt)
+            # Kiểm tra nội dung nhạy cảm NudeNet
+            is_sensitive = False
+            sens_info = None
+            sensitive_copy_name = None
+            sensitive_copy_url = None
+
+            if active_sensitive_mode in ("rename", "copy"):
+                if is_video:
+                    sens_info = check_sensitive_media(fpath, frames=video_frames, threshold=active_sensitive_thresh)
+                else:
+                    sens_info = check_sensitive(fpath, threshold=active_sensitive_thresh)
+                is_sensitive = sens_info.get("is_sensitive", False)
+                if is_sensitive:
+                    stats["sensitive"] = stats.get("sensitive", 0) + 1
+
+            if is_sensitive and active_sensitive_mode == "rename":
+                new_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+            else:
+                new_name = build_new_name(person, orig_name, fmt, is_sensitive=False)
+
+            if is_sensitive and active_sensitive_mode == "copy":
+                sensitive_copy_name = build_new_name(person, orig_name, fmt, is_sensitive=True, sensitive_prefix=cfg.sensitive_prefix)
+
             current_display_name = orig_name
 
             if apply:
@@ -660,7 +854,15 @@ async def scan_stream(
                     media_url = f"/api/media/{new_path.relative_to(PROJECT_ROOT)}?t={now_ts}"
                     status = "renamed_now"
                     stats["renamed"] += 1
+
+                    if is_sensitive and active_sensitive_mode == "copy" and sensitive_copy_name:
+                        copy_dest = generate_unique_path(new_path.parent, sensitive_copy_name)
+                        shutil.copy2(str(new_path), str(copy_dest))
+                        sensitive_copy_name = copy_dest.name
+                        sensitive_copy_url = f"/api/media/{copy_dest.relative_to(PROJECT_ROOT)}?t={now_ts}"
+                        stats["sensitive_copies"] = stats.get("sensitive_copies", 0) + 1
                 except Exception as e:
+                    logger.error(f"Lỗi khi đổi tên/sao chép tệp {orig_name}: {e}")
                     stats["error"] += 1
 
             item_data = {
@@ -673,6 +875,12 @@ async def scan_stream(
                 "reason": reason,
                 "status": status,
                 "bbox": bbox,
+                "is_sensitive": is_sensitive,
+                "sensitive_info": sens_info if is_sensitive else None,
+                "sensitive_mode": active_sensitive_mode if is_sensitive else "none",
+                "sensitive_copy_name": sensitive_copy_name,
+                "sensitive_copy_url": sensitive_copy_url,
+                "is_video": is_video,
             }
             yield f"data: {json.dumps({'type': 'item', 'index': i, 'total': len(media_files), 'stats': stats, 'item': item_data})}\n\n"
             await asyncio.sleep(0.01)
@@ -707,6 +915,8 @@ async def cluster_unknown_faces(payload: Dict[str, Any] = {}):
     dbscan_eps = eps if eps is not None else cfg.cluster_eps_cosine
 
     exclude_dirs = {d.lower() for d in cfg.exclude_dirs}
+    exclude_dirs.add(getattr(cfg, "sensitive_prefix", "sensitive").lower())
+    exclude_dirs.add("sensitive")
     exclude_dirs.add(unclassified_dir.name.lower())
     known_person_names = {
         d.name.lower() for d in dataset_root.iterdir()
@@ -877,13 +1087,167 @@ async def api_prepare(payload: Dict[str, Any] = {}):
 
 
 # ────────────────────────────────────────────────────────────
-# Real-time Web Downloader Stream (SSE)
+# Real-time Web Downloader Stream (SSE) & Manual Candidate Saving
 # ────────────────────────────────────────────────────────────
+
+def fetch_image_from_candidate(url: str) -> Optional[Image.Image]:
+    """Tải và chuyển đổi ảnh từ URL web, base64 data URL hoặc đường dẫn nội bộ."""
+    cleaned = url.strip()
+    if cleaned.startswith("data:image/"):
+        try:
+            b64_part = cleaned.split(",", 1)[-1]
+            raw_bytes = base64.b64decode(b64_part)
+            img = Image.open(BytesIO(raw_bytes))
+            img.load()
+            return img.convert("RGB")
+        except Exception as e:
+            logger.debug(f"Không thể giải mã data URL: {e}")
+            return None
+
+    if cleaned.startswith("/api/media/"):
+        try:
+            rel = cleaned.replace("/api/media/", "").lstrip("/")
+            local_path = (PROJECT_ROOT / rel).resolve()
+            if local_path.exists() and local_path.is_file():
+                img = Image.open(local_path)
+                img.load()
+                return img.convert("RGB")
+        except Exception as e:
+            logger.debug(f"Không thể mở ảnh nội bộ: {e}")
+            return None
+
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        headers_list = [
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            },
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) "
+                    "Gecko/20100101 Firefox/120.0"
+                ),
+            },
+        ]
+        for h in headers_list:
+            try:
+                req = urllib.request.Request(cleaned, headers=h)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    raw_bytes = resp.read()
+                    if len(raw_bytes) > 500:
+                        img = Image.open(BytesIO(raw_bytes))
+                        img.load()
+                        return img.convert("RGB")
+            except Exception:
+                continue
+
+    return None
+
 
 @app.post("/api/download/cancel")
 async def cancel_download():
     ACTIVE_CANCELLATIONS.add("download")
     return {"success": True, "message": "Đã gửi tín hiệu dừng tiến trình tải"}
+
+
+@app.post("/api/download/save_candidates")
+async def save_candidates(payload: Dict[str, Any]):
+    """
+    Lưu thủ công các ảnh ứng viên (kể cả ảnh bị loại / khác người / không rõ mặt) vào thư mục đích.
+    """
+    target_str = payload.get("target_dir")
+    prefix_input = payload.get("prefix")
+    person_input = payload.get("person")
+    items = payload.get("items", [])
+
+    if not items or not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="Không có ảnh nào được chọn để lưu")
+
+    # Xác định thư mục đích
+    if target_str and str(target_str).strip():
+        out_p = Path(str(target_str).strip()).expanduser()
+        if not out_p.is_absolute():
+            out_p = (PROJECT_ROOT / out_p).resolve()
+        output_dir = out_p
+    elif person_input and str(person_input).strip():
+        slug = re.sub(r"[^a-zA-Z0-9_]+", "_", str(person_input).strip().lower()).strip("_") or "person"
+        output_dir = (PROJECT_ROOT / "download" / slug).resolve()
+    else:
+        output_dir = (PROJECT_ROOT / "download" / "manual_saved").resolve()
+
+    # Kiểm tra an toàn đường dẫn
+    if not str(output_dir).startswith(str(PROJECT_ROOT)):
+        raise HTTPException(status_code=403, detail="Thư mục đích nằm ngoài phạm vi an toàn của dự án")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Tiền tố tên file
+    if prefix_input and str(prefix_input).strip():
+        clean_prefix = re.sub(r"[^a-zA-Z0-9_]+", "_", str(prefix_input).strip().lower()).strip("_") or "face"
+    else:
+        clean_prefix = re.sub(r"[^a-zA-Z0-9_]+", "_", output_dir.name.lower()).strip("_") or "face"
+
+    existing_files = {f.stem for f in output_dir.iterdir() if f.is_file()}
+    idx = 1
+    while f"{clean_prefix}_{idx:04d}" in existing_files:
+        idx += 1
+
+    saved_items = []
+    failed_items = []
+
+    for it in items:
+        cand_id = it.get("id")
+        raw_url = str(it.get("url", "")).strip()
+        if not raw_url:
+            failed_items.append({"id": cand_id, "error": "Thiếu URL ảnh"})
+            continue
+
+        img = fetch_image_from_candidate(raw_url)
+        if img is None:
+            failed_items.append({"id": cand_id, "error": "Không thể tải hoặc giải mã tệp ảnh"})
+            continue
+
+        filename = f"{clean_prefix}_{idx:04d}.jpg"
+        save_path = output_dir / filename
+        while save_path.exists() or save_path.stem in existing_files:
+            idx += 1
+            filename = f"{clean_prefix}_{idx:04d}.jpg"
+            save_path = output_dir / filename
+
+        try:
+            img.save(save_path, "JPEG", quality=95)
+            existing_files.add(save_path.stem)
+            idx += 1
+
+            rel_path = str(save_path.relative_to(PROJECT_ROOT))
+            media_url = f"/api/media/{rel_path}"
+            saved_items.append({
+                "id": cand_id,
+                "filename": filename,
+                "url": media_url,
+                "desc": it.get("desc", ""),
+                "target_dir": str(output_dir.relative_to(PROJECT_ROOT)),
+            })
+        except Exception as e:
+            failed_items.append({"id": cand_id, "error": f"Lỗi ghi tệp: {e}"})
+
+    try:
+        dest_display = str(output_dir.relative_to(PROJECT_ROOT))
+    except Exception:
+        dest_display = str(output_dir)
+
+    return {
+        "success": len(saved_items) > 0,
+        "saved_count": len(saved_items),
+        "failed_count": len(failed_items),
+        "saved": saved_items,
+        "failed": failed_items,
+        "target_dir": dest_display,
+        "message": f"Đã lưu thành công {len(saved_items)} ảnh vào {dest_display}",
+    }
 
 
 @app.get("/api/download/stream")
@@ -965,7 +1329,7 @@ async def stream_download(
             rel_dest = str(output_dir)
 
         active_mode = "video" if is_vid else ("facebook" if is_fb else ("instagram" if is_ig else "web"))
-        yield f"data: {json.dumps({'type': 'start', 'query': query, 'mode': active_mode, 'target': rel_dest, 'count': 0 if is_unlimited else count, 'unlimited': is_unlimited})}\n\n"
+        yield f"data: {json.dumps({'type': 'start', 'query': query, 'mode': active_mode, 'target': rel_dest, 'prefix': prefix, 'count': 0 if is_unlimited else count, 'unlimited': is_unlimited})}\n\n"
         await asyncio.sleep(0.04)
 
         if is_fb and real_name:
@@ -1786,27 +2150,107 @@ async def stream_download(
 
 @app.post("/api/playground")
 async def analyze_single_face(file: UploadFile = File(...)):
-    """Kiểm tra và so khớp 1 ảnh đơn lẻ với toàn bộ database."""
+    """Kiểm tra và so khớp 1 ảnh hoặc video với toàn bộ database."""
     content = await file.read()
-    try:
-        from io import BytesIO
-        pil_img = Image.open(BytesIO(content)).convert("RGB")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Không đọc được tệp ảnh")
+    orig_name = file.filename or "upload.jpg"
+    ext = Path(orig_name).suffix.lower()
+    is_video = ext in VALID_VIDEO_EXTENSIONS or (file.content_type and file.content_type.startswith("video/"))
 
     cfg = load_config()
     dataset_root = (PROJECT_ROOT / cfg.dataset_root).resolve()
     engine_obj = get_shared_engine()
     cache = get_shared_cache()
-
     known_faces, index = load_known_faces(cfg, engine_obj, cache, dataset_root)
+
+    if is_video:
+        import tempfile
+        video_ext = ext if ext in VALID_VIDEO_EXTENSIONS else ".mp4"
+        with tempfile.NamedTemporaryFile(suffix=video_ext, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+
+        try:
+            frames = engine_obj.extract_frames_from_video(tmp_path, sample_frames=cfg.sample_frames_per_video)
+            sens_info = check_sensitive_media(tmp_path, frames=frames, threshold=cfg.sensitive_threshold)
+
+            if not frames:
+                return {
+                    "is_video": True,
+                    "faces_found": 0,
+                    "results": [],
+                    "message": "Không trích xuất được khung hình từ video",
+                    "sensitive_info": sens_info,
+                }
+
+            if index is None:
+                return {
+                    "is_video": True,
+                    "faces_found": 0,
+                    "results": [],
+                    "message": "Chưa có dữ liệu khuôn mặt mẫu trong thư mục dataset",
+                    "sensitive_info": sens_info,
+                }
+
+            person, reason, conf, bbox = index.match_video(
+                frames=frames,
+                engine_obj=engine_obj,
+                top_k=cfg.top_k_neighbors,
+                threshold=cfg.cosine_threshold if cfg.engine == "insightface" else cfg.tolerance,
+                margin_threshold=cfg.margin_threshold,
+                unknown_prefix=cfg.unknown_prefix,
+                return_bbox=True,
+            )
+
+            avatar_url = None
+            if person != cfg.unknown_prefix:
+                p_dir = dataset_root / person
+                if p_dir.exists():
+                    imgs = [p for p in p_dir.iterdir() if p.is_file() and p.suffix.lower() in ALL_VALID_EXTENSIONS]
+                    if imgs:
+                        avatar_url = f"/api/media/{imgs[0].relative_to(PROJECT_ROOT)}"
+
+            top_candidates = []
+            if person != cfg.unknown_prefix:
+                top_candidates.append({
+                    "person": person,
+                    "similarity": round(conf, 1),
+                    "avatar_url": avatar_url,
+                })
+
+            face_results = [{
+                "bbox": bbox,
+                "best_match": person,
+                "confidence": conf,
+                "reason": reason,
+                "top_candidates": top_candidates,
+            }]
+
+            return {
+                "is_video": True,
+                "faces_found": 1 if (person != cfg.unknown_prefix or bbox is not None) else 0,
+                "results": face_results,
+                "sensitive_info": sens_info,
+            }
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    # Nếu là ảnh
+    try:
+        from io import BytesIO
+        pil_img = Image.open(BytesIO(content)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không đọc được tệp hình ảnh hoặc video")
 
     arr = np.array(pil_img)
     h, w, _ = arr.shape
     faces = engine_obj.app.get(arr[:, :, ::-1]) if engine_obj.engine == "insightface" else []
+    sens_info = check_sensitive(arr, threshold=cfg.sensitive_threshold)
 
     if not faces:
-        return {"faces_found": 0, "results": []}
+        return {"faces_found": 0, "results": [], "sensitive_info": sens_info, "is_video": False}
 
     face_results = []
     for f in faces:
@@ -1824,39 +2268,43 @@ async def analyze_single_face(file: UploadFile = File(...)):
             continue
         face_enc = (emb / norm).astype(np.float32)
 
-        # Tính toán top 3 người giống nhất
-        sims = index.matrix @ face_enc
-        scores = {}
-        for person, s_slice in index.person_slices.items():
-            p_sims = sims[s_slice]
-            if len(p_sims) > 0:
-                k = min(3, len(p_sims))
-                top_k_vals = np.partition(p_sims, -k)[-k:]
-                scores[person] = float(np.mean(top_k_vals))
-
-        sorted_matches = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
         top_candidates = []
-        for name, score in sorted_matches:
-            # Avatar of candidate
-            avatar_url = None
-            p_dir = dataset_root / name
-            if p_dir.exists():
-                imgs = [p for p in p_dir.iterdir() if p.is_file() and p.suffix.lower() in ALL_VALID_EXTENSIONS]
-                if imgs:
-                    avatar_url = f"/api/media/{imgs[0].relative_to(PROJECT_ROOT)}"
+        best_person = cfg.unknown_prefix
+        reason = "Chưa có dữ liệu khuôn mặt mẫu"
+        conf = 0.0
 
-            top_candidates.append({
-                "person": name,
-                "similarity": round(score * 100, 1),
-                "avatar_url": avatar_url,
-            })
+        if index is not None and getattr(index, "matrix", None) is not None:
+            # Tính toán top 3 người giống nhất
+            sims = index.matrix @ face_enc
+            scores = {}
+            for person, s_slice in index.person_slices.items():
+                p_sims = sims[s_slice]
+                if len(p_sims) > 0:
+                    k = min(3, len(p_sims))
+                    top_k_vals = np.partition(p_sims, -k)[-k:]
+                    scores[person] = float(np.mean(top_k_vals))
 
-        best_person, reason, conf = index.match_single(
-            face_enc=face_enc,
-            top_k=cfg.top_k_neighbors,
-            threshold=cfg.cosine_threshold,
-            margin_threshold=cfg.margin_threshold,
-        )
+            sorted_matches = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
+            for name, score in sorted_matches:
+                avatar_url = None
+                p_dir = dataset_root / name
+                if p_dir.exists():
+                    imgs = [p for p in p_dir.iterdir() if p.is_file() and p.suffix.lower() in ALL_VALID_EXTENSIONS]
+                    if imgs:
+                        avatar_url = f"/api/media/{imgs[0].relative_to(PROJECT_ROOT)}"
+
+                top_candidates.append({
+                    "person": name,
+                    "similarity": round(score * 100, 1),
+                    "avatar_url": avatar_url,
+                })
+
+            best_person, reason, conf = index.match_single(
+                face_enc=face_enc,
+                top_k=cfg.top_k_neighbors,
+                threshold=cfg.cosine_threshold,
+                margin_threshold=cfg.margin_threshold,
+            )
 
         face_results.append({
             "bbox": bbox,
@@ -1869,6 +2317,8 @@ async def analyze_single_face(file: UploadFile = File(...)):
     return {
         "faces_found": len(faces),
         "results": face_results,
+        "sensitive_info": sens_info,
+        "is_video": False,
     }
 
 

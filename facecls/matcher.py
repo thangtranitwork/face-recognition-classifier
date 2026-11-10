@@ -159,25 +159,55 @@ class KnownFaceIndex:
         top_k: int = 3,
         threshold: float = 0.35,
         margin_threshold: float = 0.04,
-        unknown_prefix: str = "unknown"
-    ) -> Tuple[str, str, float]:
+        unknown_prefix: str = "unknown",
+        return_bbox: bool = False,
+    ) -> Union[Tuple[str, str, float], Tuple[str, str, float, Optional[Dict[str, Any]]]]:
         """
         Nhận diện video bằng cơ chế trích xuất mặt lớn nhất từng frame và bỏ phiếu (Majority Voting).
+        det_thresh được điều chỉnh linh hoạt cho video để tránh bỏ sót do motion blur.
         """
         if not frames:
-            return unknown_prefix, "video không có khung hình hợp lệ", 0.0
+            res = (unknown_prefix, "video không có khung hình hợp lệ", 0.0)
+            return (*res, None) if return_bbox else res
 
         person_votes: Dict[str, List[float]] = {}
         valid_frames_count = 0
+        best_bbox = None
+        best_det_score = -1.0
+
+        # Ngưỡng phát hiện mềm hơn cho khung hình video (motion blur / nén MP4)
+        video_det_thresh = min(getattr(engine_obj, "det_thresh", 0.6), 0.42)
 
         for frame in frames:
-            # Áp dụng multi_face_strategy (chọn mặt nổi bật nhất trong frame)
-            embs = engine_obj.extract_face_embeddings(frame, filter_quality=True, select_single=True)
-            if not embs:
+            # Ưu tiên lấy cả bbox nếu engine hỗ trợ
+            if hasattr(engine_obj, "extract_faces_with_bboxes"):
+                faces_data = engine_obj.extract_faces_with_bboxes(
+                    frame, filter_quality=True, det_thresh=video_det_thresh
+                )
+                if not faces_data:
+                    continue
+
+                valid_frames_count += 1
+                # Chọn khuôn mặt có điểm phát hiện hoặc diện tích tốt nhất
+                top_face = max(faces_data, key=lambda f: f.get("det_score", 0.0))
+                face_enc = top_face.get("embedding")
+                det_sc = float(top_face.get("det_score", 0.0))
+                if det_sc > best_det_score:
+                    best_det_score = det_sc
+                    best_bbox = top_face.get("bbox")
+            else:
+                embs = engine_obj.extract_face_embeddings(
+                    frame, filter_quality=True, select_single=True, det_thresh=video_det_thresh
+                )
+                if not embs:
+                    continue
+
+                valid_frames_count += 1
+                face_enc = embs[0]
+
+            if face_enc is None:
                 continue
 
-            valid_frames_count += 1
-            face_enc = embs[0]
             person, reason, conf = self.match_single(
                 face_enc=face_enc,
                 top_k=top_k,
@@ -189,8 +219,13 @@ class KnownFaceIndex:
             if person != unknown_prefix:
                 person_votes.setdefault(person, []).append(conf)
 
+        if valid_frames_count == 0:
+            res = (unknown_prefix, f"video ({len(frames)} frames): không phát hiện khuôn mặt", 0.0)
+            return (*res, None) if return_bbox else res
+
         if not person_votes:
-            return unknown_prefix, f"video ({len(frames)} frames): không nhận diện được ai", 0.0
+            res = (unknown_prefix, f"video ({len(frames)} frames): phát hiện mặt ({valid_frames_count} frames) nhưng là người lạ", 0.0)
+            return (*res, best_bbox) if return_bbox else res
 
         # Lấy người có số frame bầu chọn cao nhất và confidence trung bình cao nhất
         top_person, confs = max(person_votes.items(), key=lambda item: (len(item[1]), np.mean(item[1])))
@@ -198,4 +233,5 @@ class KnownFaceIndex:
         votes_count = len(confs)
 
         reason = f"video: {votes_count}/{valid_frames_count} frames khớp {top_person} (conf TB {avg_conf}%)"
-        return top_person, reason, avg_conf
+        res = (top_person, reason, avg_conf)
+        return (*res, best_bbox) if return_bbox else res

@@ -28,7 +28,9 @@ def cli():
 @click.option("--dir", "-d", "--target-dir", "target_dir", default=None, help="Thư mục cần xử lý.")
 @click.option("--apply", "-a", is_flag=True, default=False, help="Thực sự đổi tên tệp (mặc định Dry-run).")
 @click.option("--clear-cache", "-cc", is_flag=True, default=False, help="Xóa bộ nhớ đệm cache.")
-def cmd_rename(config: str, target_dir: Optional[str], apply: bool, clear_cache: bool):
+@click.option("--sensitive-mode", "-sm", type=click.Choice(["none", "rename", "copy"], case_sensitive=False), default=None, help="Chế độ xử lý ảnh nhạy cảm NudeNet (none, rename, copy).")
+@click.option("--sensitive-thresh", "-st", type=float, default=None, help="Ngưỡng phát hiện ảnh nhạy cảm (mặc định 0.35).")
+def cmd_rename(config: str, target_dir: Optional[str], apply: bool, clear_cache: bool, sensitive_mode: Optional[str], sensitive_thresh: Optional[float]):
     """Nhận diện khuôn mặt và đổi tên tệp."""
     cfg = load_config(config)
     dataset_root = Path(cfg.dataset_root).expanduser().resolve()
@@ -39,7 +41,14 @@ def cmd_rename(config: str, target_dir: Optional[str], apply: bool, clear_cache:
         cache.clear()
         click.echo("🗑️ Đã xóa cache.")
 
-    run_rename(cfg=cfg, cache=cache, target_dir=target_dir, apply=apply)
+    run_rename(
+        cfg=cfg,
+        cache=cache,
+        target_dir=target_dir,
+        apply=apply,
+        sensitive_mode=sensitive_mode,
+        sensitive_thresh=sensitive_thresh,
+    )
 
 
 @cli.command("cluster")

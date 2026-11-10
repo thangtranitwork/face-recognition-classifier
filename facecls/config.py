@@ -14,7 +14,7 @@ class AppConfig:
     unclassified_dir: str = "chua_phan_loai"
     exclude_dirs: List[str] = field(default_factory=lambda: [
         "chua_phan_loai", "khac", "other", "GV", "DD", "N", "Ng",
-        "Nhiều", "neko", "S", "ADT", "NCDK"
+        "Nhiều", "neko", "S", "ADT", "NCDK", "sensitive"
     ])
 
     # Nhận diện & mô hình
@@ -47,6 +47,12 @@ class AppConfig:
     name_format: str = "{person}_{original}"
     low_confidence_format: str = "low_{person}_{original}"
     unknown_prefix: str = "unknown"
+
+    # Kiểm duyệt ảnh nhạy cảm (NudeNet NSFW)
+    enable_sensitive_check: bool = False
+    sensitive_mode: str = "rename"  # "rename" hoặc "copy"
+    sensitive_threshold: float = 0.35
+    sensitive_prefix: str = "sensitive"
 
     # Bộ nhớ đệm (Cache)
     use_cache: bool = True
